@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Supplier\Controllers\SupplierController;
 use Modules\Supplier\Controllers\SupplierPaymentController;
 
-Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::apiResource('suppliers', SupplierController::class)->except(['update']);
     Route::patch('suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update');

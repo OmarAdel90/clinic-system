@@ -30,12 +30,7 @@ Route::middleware(['auth:sanctum'])->prefix('campaign-costs')->group(function ()
     Route::delete('{campaignCost}', [CampaignCostController::class, 'destroy']);
 });
 
-Route::middleware(['auth:sanctum'])->prefix('leads')->group(function () {
-    Route::get('/', [CallCenterController::class, 'leads']);
-    Route::post('/', [CallCenterController::class, 'storeLead']);
-    Route::post('assign', [CallCenterController::class, 'assignToUser']);
-    Route::get('{id}', [CallCenterController::class, 'lead']);
-    Route::post('{leadId}/assign-next', [CallCenterController::class, 'assignNext']);
-    Route::patch('{lead}', [CallCenterController::class, 'updateLead']);
-    Route::delete('{lead}', [CallCenterController::class, 'destroyLead']);
+Route::middleware(['auth:sanctum'])->prefix('call-center')->group(function () {
+    Route::post('leads/assign', [CallCenterController::class, 'assignToUser']);
+    Route::post('leads/{leadId}/assign-next', [CallCenterController::class, 'assignNext']);
 });

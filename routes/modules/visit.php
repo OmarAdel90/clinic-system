@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Visit\Controllers\VisitController;
 use Modules\Visit\Controllers\VisitFlowController;
 
-Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::apiResource('visits', VisitController::class)->except(['update']);
     Route::patch('visits/{visit}', [VisitController::class, 'update'])->name('visits.update');
