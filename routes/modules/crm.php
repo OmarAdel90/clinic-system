@@ -11,7 +11,9 @@ Route::middleware(['auth:sanctum'])->prefix('call-center')->group(function () {
     Route::post('queue/add/{userId}', [CallCenterController::class, 'addToQueue']);
     Route::delete('queue/remove/{userId}', [CallCenterController::class, 'removeFromQueue']);
 
-    Route::get('users', [CallCenterController::class, 'users']);
+
+    Route::post('leads/assign', [CallCenterController::class, 'assignToUser']);
+    Route::post('leads/{leadId}/assign-next', [CallCenterController::class, 'assignNext']);
 });
 
 Route::middleware(['auth:sanctum'])->prefix('campaigns')->group(function () {
@@ -28,9 +30,4 @@ Route::middleware(['auth:sanctum'])->prefix('campaign-costs')->group(function ()
     Route::get('{campaignCost}', [CampaignCostController::class, 'show']);
     Route::patch('{campaignCost}', [CampaignCostController::class, 'update']);
     Route::delete('{campaignCost}', [CampaignCostController::class, 'destroy']);
-});
-
-Route::middleware(['auth:sanctum'])->prefix('call-center')->group(function () {
-    Route::post('leads/assign', [CallCenterController::class, 'assignToUser']);
-    Route::post('leads/{leadId}/assign-next', [CallCenterController::class, 'assignNext']);
 });

@@ -3,7 +3,7 @@
 namespace Modules\Visit\Controllers;
 
 use App\Http\Controllers\Controller;
-use Modules\Visit\Models\Report;
+use Modules\Visit\Models\Visit;
 use Modules\Visit\Requests\IndexVisitRequest;
 use Modules\Visit\Requests\ShowVisitRequest;
 use Modules\Visit\Requests\StoreVisitRequest;
@@ -21,8 +21,14 @@ class VisitController extends Controller
         return response()->json($this->service->getAll($request->user()));
     }
 
-    public function show(ShowVisitRequest $request, Report $report): JsonResponse
+    public function show(ShowVisitRequest $request, Visit $visit): JsonResponse
     {
+        $report = $visit->report;
+
+        if (!$report) {
+            return response()->json(['message' => 'Report not found for this visit.'], 404);
+        }
+
         return response()->json($this->service->get($report->id, $request->user()));
     }
 
@@ -35,8 +41,14 @@ class VisitController extends Controller
         }
     }
 
-    public function update(UpdateVisitRequest $request, Report $report): JsonResponse
+    public function update(UpdateVisitRequest $request, Visit $visit): JsonResponse
     {
+        $report = $visit->report;
+
+        if (!$report) {
+            return response()->json(['message' => 'Report not found for this visit.'], 404);
+        }
+
         try {
             return response()->json($this->service->update($report, $request->validated()));
         } catch (\RuntimeException $e) {
@@ -44,8 +56,14 @@ class VisitController extends Controller
         }
     }
 
-    public function destroy(DestroyVisitRequest $request, Report $report): JsonResponse
+    public function destroy(DestroyVisitRequest $request, Visit $visit): JsonResponse
     {
+        $report = $visit->report;
+
+        if (!$report) {
+            return response()->json(null, 204);
+        }
+
         $this->service->delete($report);
         return response()->json(null, 204);
     }

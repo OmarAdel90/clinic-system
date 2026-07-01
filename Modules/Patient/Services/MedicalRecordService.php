@@ -60,7 +60,7 @@ class MedicalRecordService
             return DB::transaction(function () use ($leadId, $data) {
                 $file = $data['file'];
 
-                $path = $file->store('medical-records/' . $leadId, 'public');
+                $path = $file->store('medical-records/' . $leadId);
 
                 return MedicalRecord::create([
                     'lead_id'       => $leadId,
@@ -86,9 +86,9 @@ class MedicalRecordService
         try {
             return DB::transaction(function () use ($record, $data) {
                 if (isset($data['file'])) {
-                    Storage::disk('public')->delete($record->file_path);
+                    Storage::disk('local')->delete($record->file_path);
 
-                    $path = $data['file']->store('medical-records/' . $record->lead_id, 'public');
+                    $path = $data['file']->store('medical-records/' . $record->lead_id);
 
                     $record->update([
                         'file_path'     => $path,
@@ -119,7 +119,7 @@ class MedicalRecordService
     {
         try {
             DB::transaction(function () use ($record) {
-                Storage::disk('public')->delete($record->file_path);
+                Storage::disk('local')->delete($record->file_path);
                 $record->delete();
             });
         } catch (QueryException $e) {
@@ -134,7 +134,7 @@ class MedicalRecordService
     public function filePath(MedicalRecord $record): string
     {
         try {
-            return Storage::disk('public')->path($record->file_path);
+            return Storage::disk('local')->path($record->file_path);
         } catch (\Throwable $e) {
             Log::critical(__METHOD__ . ' encountered an unexpected error', ['error' => $e->getMessage()]);
             throw $e;

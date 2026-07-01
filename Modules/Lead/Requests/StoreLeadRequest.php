@@ -14,6 +14,7 @@ class StoreLeadRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'campaign_id'    => 'required|integer|exists:campaigns,id',
             'platform'       => 'required|string|max:50',
             'whatsapp_id'    => 'nullable|string|max:100',
             'phone'          => 'required|string|max:20',

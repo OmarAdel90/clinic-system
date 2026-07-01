@@ -14,9 +14,9 @@ class UpdateLeadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'platform'       => 'sometimes|required|string|max:50',
+            'platform'       => 'sometimes|string|max:50',
             'whatsapp_id'    => 'nullable|string|max:100',
-            'phone'          => 'sometimes|required|string|max:20',
+            'phone'          => 'sometimes|string|max:20',
             'name'           => 'nullable|string|max:255',
             'profile_name'   => 'nullable|string|max:255',
             'metadata'       => 'nullable|array',

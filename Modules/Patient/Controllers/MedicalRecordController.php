@@ -19,21 +19,12 @@ class MedicalRecordController extends Controller
 
     public function index(IndexMedicalRecordRequest $request, int $leadId): JsonResponse
     {
-        $this->verifyAccess($leadId);
-
         return response()->json($this->service->getByLead($leadId, $request->user()));
-    }
-
-    public function show(ShowMedicalRecordRequest $request, int $leadId, MedicalRecord $medicalRecord): JsonResponse
-    {
-        abort_if($medicalRecord->lead_id !== $leadId, 404);
-        $this->verifyAccess($leadId);
-
-        return response()->json($medicalRecord);
     }
 
     public function store(int $leadId, StoreMedicalRecordRequest $request): JsonResponse
     {
+        
         Lead::findOrFail($leadId);
 
         $record = $this->service->upload($leadId, $request->validated());
@@ -41,42 +32,37 @@ class MedicalRecordController extends Controller
         return response()->json($record, 201);
     }
 
-    public function update(int $leadId, MedicalRecord $medicalRecord, UpdateMedicalRecordRequest $request): JsonResponse
+    public function show(ShowMedicalRecordRequest $request, MedicalRecord $medicalRecord): JsonResponse
     {
-        abort_if($medicalRecord->lead_id !== $leadId, 404);
+        return response()->json($medicalRecord);
+    }
 
+    public function update(UpdateMedicalRecordRequest $request, MedicalRecord $medicalRecord): JsonResponse
+    {
         return response()->json($this->service->update($medicalRecord, $request->validated()));
     }
 
-    public function destroy(DestroyMedicalRecordRequest $request, int $leadId, MedicalRecord $medicalRecord): JsonResponse
+    public function destroy(DestroyMedicalRecordRequest $request, MedicalRecord $medicalRecord): JsonResponse
     {
-        abort_if($medicalRecord->lead_id !== $leadId, 404);
-
         $this->service->delete($medicalRecord);
 
         return response()->json(null, 204);
     }
 
-    public function download(int $leadId, MedicalRecord $medicalRecord): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function file(ShowMedicalRecordRequest $request, MedicalRecord $medicalRecord): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
-        abort_if($medicalRecord->lead_id !== $leadId, 404);
-        $this->verifyAccess($leadId);
+        return response()->file(
+            $this->service->filePath($medicalRecord),
+            ['Content-Type' => $medicalRecord->mime_type]
+        );
+    }
 
+    public function download(ShowMedicalRecordRequest $request, MedicalRecord $medicalRecord): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
         return response()->download(
             $this->service->filePath($medicalRecord),
             $medicalRecord->original_name,
             ['Content-Type' => $medicalRecord->mime_type]
         );
-    }
-
-    protected function verifyAccess(int $leadId): void
-    {
-        $user = auth()->user();
-
-        if ($user->isAdmin()) {
-            return;
-        }
-
-        abort(403);
     }
 }
