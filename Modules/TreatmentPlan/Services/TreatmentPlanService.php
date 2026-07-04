@@ -6,8 +6,8 @@ use Modules\Auth\Models\User;
 use Modules\Clinic\Models\Clinic;
 use Modules\TreatmentPlan\Models\TreatmentPlan;
 use Modules\Visit\Models\Visit;
-use Modules\Warehouse\Models\Warehouse;
 use Modules\Warehouse\Models\WarehouseInventory;
+use Modules\Warehouse\Services\WarehouseService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Log;
 
 class TreatmentPlanService
 {
+    public function __construct(
+        protected WarehouseService $warehouseService,
+    ) {}
     public function getAll(?User $user = null)
     {
         try {
@@ -117,13 +120,11 @@ class TreatmentPlanService
 
     protected function reserveSupplies(int $clinicId, array $supplies): void
     {
-        $warehouse = Warehouse::where('clinic_id', $clinicId)->first();
+        $warehouseId = $this->warehouseService->getWarehouseIdForClinic($clinicId);
 
-        if (!$warehouse || empty($supplies)) {
+        if (!$warehouseId || empty($supplies)) {
             return;
         }
-
-        $warehouseId = $warehouse->id;
 
         foreach ($supplies as $item) {
             $inventory = WarehouseInventory::where('warehouse_id', $warehouseId)
@@ -148,13 +149,11 @@ class TreatmentPlanService
 
     protected function releaseSupplies(int $clinicId, array $supplies): void
     {
-        $warehouse = Warehouse::where('clinic_id', $clinicId)->first();
+        $warehouseId = $this->warehouseService->getWarehouseIdForClinic($clinicId);
 
-        if (!$warehouse || empty($supplies)) {
+        if (!$warehouseId || empty($supplies)) {
             return;
         }
-
-        $warehouseId = $warehouse->id;
 
         foreach ($supplies as $item) {
             WarehouseInventory::where('warehouse_id', $warehouseId)

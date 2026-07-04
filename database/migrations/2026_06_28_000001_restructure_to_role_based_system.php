@@ -69,15 +69,40 @@ return new class extends Migration
         });
 
         if (Schema::hasColumn('reports', 'doctor_id')) {
+            try {
+                Schema::table('reports', function (Blueprint $table) {
+                    $table->dropForeign(['doctor_id']);
+                });
+            } catch (\Throwable $e) {
+                // FK may have already been dropped
+            }
             Schema::table('reports', function (Blueprint $table) {
                 $table->dropColumn('doctor_id');
             });
         }
         if (Schema::hasColumn('reports', 'patient_id')) {
+            try {
+                Schema::table('reports', function (Blueprint $table) {
+                    $table->dropForeign(['patient_id']);
+                });
+            } catch (\Throwable $e) {
+                // FK may have already been dropped
+            }
             Schema::table('reports', function (Blueprint $table) {
                 $table->dropColumn('patient_id');
             });
         }
+        Schema::table('reports', function (Blueprint $table) {
+            if (!Schema::hasColumn('reports', 'lead_id')) {
+                $table->foreignId('lead_id')->nullable()->constrained()->nullOnDelete()->after('id');
+            }
+            if (!Schema::hasColumn('reports', 'user_id')) {
+                $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete()->after('lead_id');
+            }
+            if (!Schema::hasColumn('reports', 'cost_known')) {
+                $table->boolean('cost_known')->default(false)->after('status');
+            }
+        });
 
         if (Schema::hasColumn('visits', 'patient_id')) {
             Schema::table('visits', function (Blueprint $table) {

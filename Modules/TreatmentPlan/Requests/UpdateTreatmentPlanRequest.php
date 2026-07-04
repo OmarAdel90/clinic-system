@@ -19,7 +19,7 @@ class UpdateTreatmentPlanRequest extends FormRequest
             'clinic_id'                                   => 'sometimes|required|integer|exists:clinics,id',
             'diagnosis'                                   => 'nullable|string',
             'notes'                                       => 'nullable|string',
-            'visits'                                      => 'sometimes|required|array|min:1',
+            'visits'                                      => 'nullable|array',
             'visits.*.scheduled_date'                     => 'required_with:visits|date',
             'visits.*.supplies_reserved'                  => 'nullable|array',
             'visits.*.supplies_reserved.*.sku'            => 'required_with:visits.*.supplies_reserved|string|max:100',

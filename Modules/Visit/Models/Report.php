@@ -24,11 +24,13 @@ class Report extends Model
         'supplies_used',
         'body',
         'status',
+        'cost_known',
     ];
 
     protected $casts = [
         'visit_date'    => 'datetime',
         'supplies_used' => 'array',
+        'cost_known'    => 'boolean',
     ];
 
     public function user()

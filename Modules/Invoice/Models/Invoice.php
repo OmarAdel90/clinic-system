@@ -16,7 +16,9 @@ class Invoice extends Model
         protected $fillable = [
         'lead_id',
         'clinic_id',
+        'report_id',
         'treatment_plan_id',
+        'invoice_number',
         'services_cost',
         'supplies_cost',
         'total_cost',

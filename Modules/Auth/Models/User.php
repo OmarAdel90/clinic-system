@@ -68,11 +68,6 @@ class User extends Authenticatable
             && !$this->isOnline();
     }
 
-    public function isAdmin(): bool
-    {
-        return $this->hasRole('admin');
-    }
-
     public function assignedConversations()
     {
         return $this->hasMany(Conversation::class, 'assigned_user_id');
