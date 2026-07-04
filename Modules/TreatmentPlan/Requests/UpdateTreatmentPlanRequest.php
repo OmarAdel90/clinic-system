@@ -14,9 +14,9 @@ class UpdateTreatmentPlanRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'lead_id'                                     => 'sometimes|required|integer|exists:leads,id',
-            'user_id'                                     => 'sometimes|required|integer|exists:users,id',
-            'clinic_id'                                   => 'sometimes|required|integer|exists:clinics,id',
+            'lead_id'                                     => 'sometimes|integer|exists:leads,id',
+            'user_id'                                     => 'sometimes|integer|exists:users,id',
+            'clinic_id'                                   => 'sometimes|integer|exists:clinics,id',
             'diagnosis'                                   => 'nullable|string',
             'notes'                                       => 'nullable|string',
             'visits'                                      => 'nullable|array',

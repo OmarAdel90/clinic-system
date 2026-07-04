@@ -29,7 +29,7 @@ class InvoiceController extends Controller
 
     public function store(StoreInvoiceRequest $request): JsonResponse
     {
-        return response()->json($this->service->update(new Invoice(), $request->validated()), 201);
+        return response()->json($this->service->create($request->validated()), 201);
     }
 
     public function update(UpdateInvoiceRequest $request, Invoice $invoice): JsonResponse
