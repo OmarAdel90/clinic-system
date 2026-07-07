@@ -1,58 +1,131 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Clinic Management System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A modular, role-based backend API for managing a medical clinic's full operational workflow — from lead acquisition via social media webhooks to appointment scheduling, clinical reporting, inventory management, and billing.
 
-## About Laravel
+Built with **Laravel 13**, **Sanctum** (token auth), **Spatie Permissions** (RBAC), and **Pest PHP** (testing).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tech Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Layer | Technology |
+|-------|-----------|
+| **Language** | PHP ^8.3 |
+| **Framework** | Laravel ^13.8 |
+| **Auth** | Laravel Sanctum (token-based) |
+| **Authorization** | Spatie Laravel Permission ^8.0 |
+| **Database** | MySQL (prod), SQLite (testing) |
+| **Queue / Cache / Session** | Database driver |
+| **Testing** | Pest PHP ^4.7 |
+| **Frontend assets** | Vite + TailwindCSS ^4.0 |
+| **Meta Integration** | WhatsApp Cloud API, Facebook Messenger, Instagram |
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Quick Start
 
 ```bash
-composer require laravel/boost --dev
+# 1. Install PHP dependencies
+composer install
 
-php artisan boost:install
+# 2. Configure environment
+copy .env.example .env
+# Edit .env with your database credentials and Meta API keys
+
+# 3. Generate app key & run migrations
+php artisan key:generate
+php artisan migrate --seed
+
+# 4. Install & build frontend assets (optional)
+npm install
+npm run build
+
+# 5. Start development server
+composer run dev
+# Starts: php artisan serve + queue:listen + npm run dev
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### Default Super Admin
 
-## Contributing
+After seeding:
+- **Email:** `super@clinic.com`
+- **Password:** `password123`
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## Project Structure
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```
+├── Modules/                  # Domain modules (12 modules)
+│   ├── Auth/                 # Authentication, users, roles, permissions
+│   ├── Clinic/               # Clinic CRUD
+│   ├── CRM/                  # Campaigns, webhooks, call center, messaging
+│   ├── Lead/                 # Lead management & status tracking
+│   ├── Patient/              # Medical records & patient feedback
+│   ├── Visit/                # Appointment scheduling & visit lifecycle
+│   ├── TreatmentPlan/        # Multi-visit treatment plans
+│   ├── Invoice/              # Billing & payment tracking
+│   ├── Pharmaceutical/       # Medication/pharmaceutical catalog
+│   ├── Warehouse/            # Inventory management
+│   ├── Supplier/             # Supplier & payment management
+│   └── Transaction/          # Warehouse-supplier transactions
+├── routes/
+│   ├── api.php               # Main API router (includes all module routes)
+│   ├── modules/              # 14 route files (one per module)
+│   └── web.php               # Single welcome route
+├── database/
+│   ├── migrations/           # 47 migration files
+│   └── seeders/              # Role/permission & test data seeders
+├── tests/                    # Pest PHP tests
+├── bootstrap/app.php         # Middleware aliases & JSON forcing
+└── bootstrap/providers.php   # Service provider registration
+```
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Key Features
 
-## License
+- **Multi-Channel CRM** — WhatsApp Cloud API, Facebook Messenger, Instagram integration with webhook handling
+- **Call Center** — Round-robin lead assignment, agent queue management, performance metrics
+- **Lead Lifecycle** — Configurable statuses, status history, conversion tracking
+- **Visit Management** — Schedule, confirm, complete, cancel, or miss appointments
+- **Inventory Control** — Warehouse stock with reservations, auto-deduction on visit completion
+- **Role-Based Access** — 26 models × 7 actions (182 permissions) with granular user authorization
+- **Billing** — Auto-generated invoices from visits, partial payment support
+- **Supplier Management** — Purchase orders, payment tracking
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+---
+
+## Documentation
+
+Detailed documentation is available in the [`docs/`](./docs) directory:
+
+| Document | Description |
+|----------|-------------|
+| [Getting Started](./docs/getting-started.md) | Installation, configuration, running |
+| [Architecture](./docs/architecture.md) | Module pattern, auth, permissions, error handling |
+| [API Reference](./docs/api-reference.md) | Complete endpoint listing |
+| [Database Schema](./docs/database-schema.md) | Tables, columns, relationships |
+| [Modules](./docs/modules.md) | Per-module detailed breakdown |
+| [Business Workflows](./docs/business-workflows.md) | End-to-end process documentation |
+
+---
+
+## Running Tests
+
+```bash
+composer test
+```
+
+Uses SQLite in-memory database. Tests are located in `tests/Feature/` and `tests/Unit/`.
+
+---
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `composer run setup` | Full initial setup (install, env, key, migrate, build) |
+| `composer run dev` | Start dev server + queue worker + Vite HMR |
+| `composer run test` | Run tests |
+| `php artisan queue:listen` | Process queued jobs (webhook handling, etc.) |
