@@ -1,0 +1,31 @@
+SECTION 1: Users and Roles
+- the system contains starts off with only 1 user which is the admin, admin has all permissions
+he then creates roles and gives these roles permissions he then assignes those roles to users
+
+SECTION 2: Leads and agents
+- leads come from facebook and whatsapp and are assigned to agents(a role) thorough a queue, 
+then the agent assignes the lead to a clinic which can provide medication or not
+
+SECTION 3: Clinics
+- if clinics provide medication then they have a warehouse that supplies them, each clinic may have ONLY ONE warehouse.
+
+SECTION 4: Warehouse and suppliers
+- Warehouses can have many suppliers and each warehouse has its own inventory of items the supplier-warehouse transaction should be kept track of and when a supplier provides a batch the 
+inventory should be updated with the total number. I need to have supplier payment history to keep track of they money they need and the amount that was paid to them, no time limit
+
+SECTION 5: Visits, reports and treatment plans
+- When a patient (converted lead) makes an appointment through the agent assigned to them
+he reconfirms the visit a day before the visit, if he actually did go the clinic confirms it if not then the apointment is automatically cancelled and the agent would call them them again to ask if they want another appointment, when a patient does go to the clinic and gets treated by a doctor(another user with different permissions) a report is  created stating usefull info like the diagnosis and the services used and the supplies used if there is any. A treatment plan is also created in case the patient requires multiple visits agent doesnt call to confirm those, supplies should be automatically reserved in released if not used
+
+SECTION 6: Invoices
+- There are 2 types of invoices 1st type is that they come one time and used services and supplies
+an invoice is created with the required amount to pay, the second type is that the patient will come over multiple visits then a general invoice would be generated from the total service costs of the visits and the used up supplies invoices should be editable just in case, no time limit
+
+SECTION 7: Medical reports
+- Patients (converted leads) may supply medical history in the form of images,pdf,word, etc
+they need to be stored and be retreivable and downloadable
+
+SECTION 8: Performance metrics
+i need to keep track of performance metrics of agent like when i lead messaged them and when they responded, like really basic stuff about them, no commissions at all 
+
+GENERAL NOTE: Everything should have basic CRUD operations

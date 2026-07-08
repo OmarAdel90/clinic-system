@@ -4,6 +4,7 @@ namespace Modules\Lead\Controllers;
 
 use App\Http\Controllers\Controller;
 use Modules\Lead\Models\Lead;
+use Modules\Lead\Requests\AssignLeadClinicRequest;
 use Modules\Lead\Requests\IndexLeadRequest;
 use Modules\Lead\Requests\ShowLeadRequest;
 use Modules\Lead\Requests\StoreLeadRequest;
@@ -49,5 +50,17 @@ class LeadController extends Controller
     {
         $this->service->delete($lead);
         return response()->json(null, 204);
+    }
+
+    public function assignClinic(AssignLeadClinicRequest $request, Lead $lead): JsonResponse
+    {
+        try {
+            return response()->json([
+                'message' => 'Lead assigned to clinic successfully.',
+                'lead' => $this->service->assignClinic($lead, $request->validated()['clinic_id'], $request->user()),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

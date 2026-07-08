@@ -4,6 +4,8 @@ namespace Modules\Lead\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Auth\Models\User;
+use Modules\Clinic\Models\Clinic;
 use Modules\CRM\Models\Campaign;
 use Modules\CRM\Models\Conversation;
 use Modules\CRM\Models\AssignmentState;
@@ -14,6 +16,9 @@ class Lead extends Model
 
         protected $fillable = [
         'campaign_id',
+        'clinic_id',
+        'clinic_assigned_by',
+        'clinic_assigned_at',
         'platform',
         'whatsapp_id',
         'phone',
@@ -25,6 +30,7 @@ class Lead extends Model
 
     protected $casts = [
         'metadata' => 'array',
+        'clinic_assigned_at' => 'datetime',
     ];
 
     public function campaign()
@@ -40,6 +46,16 @@ class Lead extends Model
     public function leadStatus()
     {
         return $this->belongsTo(LeadStatus::class);
+    }
+
+    public function clinic()
+    {
+        return $this->belongsTo(Clinic::class);
+    }
+
+    public function clinicAssignedBy()
+    {
+        return $this->belongsTo(User::class, 'clinic_assigned_by');
     }
 
     public function assignmentState()
