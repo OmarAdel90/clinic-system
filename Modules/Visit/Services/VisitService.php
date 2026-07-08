@@ -95,7 +95,7 @@ class VisitService
     {
         try {
             return DB::transaction(function () use ($data) {
-                $payload = $this->mapVisitPayload($data);
+                $payload = $this->mapVisitPayload($data, true);
                 $visit = Visit::create($payload);
 
                 return $visit->load(['user', 'lead', 'clinic', 'treatmentPlan', 'conversation', 'report.invoice']);
@@ -222,7 +222,7 @@ class VisitService
         return 'partial';
     }
 
-    protected function mapVisitPayload(array $data): array
+    protected function mapVisitPayload(array $data, bool $applyDefaultStatus = false): array
     {
         $payload = [];
 
@@ -238,13 +238,29 @@ class VisitService
             $payload['clinic_id'] = $data['clinic_id'];
         }
 
+        if (array_key_exists('treatment_plan_id', $data)) {
+            $payload['treatment_plan_id'] = $data['treatment_plan_id'];
+        }
+
+        if (array_key_exists('conversation_id', $data)) {
+            $payload['conversation_id'] = $data['conversation_id'];
+        }
+
+        if (array_key_exists('visit_number', $data)) {
+            $payload['visit_number'] = $data['visit_number'];
+        }
+
         if (array_key_exists('visit_date', $data)) {
             $payload['scheduled_date'] = $data['visit_date'];
         }
 
+        if (array_key_exists('supplies_reserved', $data)) {
+            $payload['supplies_reserved'] = $data['supplies_reserved'];
+        }
+
         if (array_key_exists('status', $data)) {
             $payload['status'] = $data['status'];
-        } elseif (! isset($payload['status'])) {
+        } elseif ($applyDefaultStatus) {
             $payload['status'] = 'scheduled';
         }
 
