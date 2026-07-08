@@ -3,9 +3,7 @@
 namespace Modules\Visit\Services;
 
 use Modules\Auth\Models\User;
-use Modules\Clinic\Models\Clinic;
-use Modules\Invoice\Models\Invoice;
-use Modules\Visit\Models\Report;
+use Modules\Visit\Models\Visit;
 use Modules\Warehouse\Services\WarehouseService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -21,7 +19,7 @@ class VisitService
     public function getAll(?User $user = null)
     {
         try {
-            $query = Report::with(['user', 'lead', 'clinic', 'invoice']);
+            $query = Visit::with(['user', 'lead', 'clinic', 'treatmentPlan', 'conversation', 'report.invoice']);
 
             if ($user && !$user->can('view_any_visit')) {
                 $query->where('user_id', $user->id);
@@ -37,10 +35,10 @@ class VisitService
         }
     }
 
-    public function get(string $id, ?User $user = null): Report
+    public function get(string $id, ?User $user = null): Visit
     {
         try {
-            $query = Report::with(['user', 'lead', 'clinic', 'invoice']);
+            $query = Visit::with(['user', 'lead', 'clinic', 'treatmentPlan', 'conversation', 'report.invoice']);
 
             if ($user && !$user->can('view_any_visit')) {
                 $query->where('user_id', $user->id);
@@ -62,9 +60,9 @@ class VisitService
     public function getByLead(int $leadId)
     {
         try {
-            return Report::with(['user', 'clinic', 'invoice'])
+            return Visit::with(['user', 'clinic', 'report.invoice'])
                 ->where('lead_id', $leadId)
-                ->orderBy('visit_date', 'desc')
+                ->orderBy('scheduled_date', 'desc')
                 ->get();
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['lead_id' => $leadId, 'error' => $e->getMessage()]);
@@ -78,9 +76,9 @@ class VisitService
     public function getByUser(int $userId)
     {
         try {
-            return Report::with(['lead', 'clinic', 'invoice'])
+            return Visit::with(['lead', 'clinic', 'report.invoice'])
                 ->where('user_id', $userId)
-                ->orderBy('visit_date', 'desc')
+                ->orderBy('scheduled_date', 'desc')
                 ->get();
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
@@ -91,25 +89,14 @@ class VisitService
         }
     }
 
-    public function create(array $data): Report
+    public function create(array $data): Visit
     {
         try {
             return DB::transaction(function () use ($data) {
-                $data['status'] = $data['status'] ?? 'active';
+                $payload = $this->mapVisitPayload($data);
+                $visit = Visit::create($payload);
 
-                $report = Report::create($data);
-
-                $warehouseId = $this->warehouseService->getWarehouseIdForClinic($report->clinic_id);
-
-                if ($warehouseId && !empty($report->supplies_used)) {
-                    $this->warehouseService->deductInventory($warehouseId, $report->supplies_used);
-                }
-
-                if ($report->cost_known) {
-                    $this->generateInvoice($report);
-                }
-
-                return $report->load(['user', 'lead', 'clinic', 'invoice']);
+                return $visit->load(['user', 'lead', 'clinic', 'treatmentPlan', 'conversation', 'report.invoice']);
             });
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['error' => $e->getMessage(), 'data' => $data]);
@@ -120,28 +107,17 @@ class VisitService
         }
     }
 
-    public function update(Report $report, array $data): Report
+    public function update(Visit $visit, array $data): Visit
     {
         try {
-            return DB::transaction(function () use ($report, $data) {
-                $report->update($data);
+            return DB::transaction(function () use ($visit, $data) {
+                $payload = $this->mapVisitPayload($data);
+                $visit->update($payload);
 
-                if (isset($data['supplies_used'])) {
-                    $warehouseId = $this->warehouseService->getWarehouseIdForClinic($report->clinic_id);
-
-                    if ($warehouseId) {
-                        $this->warehouseService->deductInventory($warehouseId, $data['supplies_used']);
-                    }
-                }
-
-                if ($report->cost_known && !$report->invoice) {
-                    $this->generateInvoice($report);
-                }
-
-                return $report->fresh(['user', 'lead', 'clinic', 'invoice']);
+                return $visit->fresh(['user', 'lead', 'clinic', 'treatmentPlan', 'conversation', 'report.invoice']);
             });
         } catch (QueryException $e) {
-            Log::error(__METHOD__ . ' failed', ['model_id' => $report->id, 'error' => $e->getMessage(), 'data' => $data]);
+            Log::error(__METHOD__ . ' failed', ['model_id' => $visit->id, 'error' => $e->getMessage(), 'data' => $data]);
             throw $e;
         } catch (\Throwable $e) {
             Log::critical(__METHOD__ . ' encountered an unexpected error', ['error' => $e->getMessage()]);
@@ -149,12 +125,24 @@ class VisitService
         }
     }
 
-    public function delete(Report $report): void
+    public function delete(Visit $visit): void
     {
         try {
-            $report->delete();
+            DB::transaction(function () use ($visit) {
+                $report = $visit->report;
+
+                if ($report?->invoice) {
+                    $report->invoice->delete();
+                }
+
+                if ($report) {
+                    $report->delete();
+                }
+
+                $visit->delete();
+            });
         } catch (QueryException $e) {
-            Log::error(__METHOD__ . ' failed', ['model_id' => $report->id, 'error' => $e->getMessage()]);
+            Log::error(__METHOD__ . ' failed', ['model_id' => $visit->id, 'error' => $e->getMessage()]);
             throw $e;
         } catch (\Throwable $e) {
             Log::critical(__METHOD__ . ' encountered an unexpected error', ['error' => $e->getMessage()]);
@@ -162,36 +150,32 @@ class VisitService
         }
     }
 
-    protected function generateInvoice(Report $report): Invoice
+    protected function mapVisitPayload(array $data): array
     {
-        $servicesCost = 0;
-        $suppliesCost = 0;
-        $service = Clinic::find($report->clinic_id);
-        if ($service && $service->services) {
-            foreach ($service->services as $procedure) {
-                $servicesCost += floatval($procedure['cost'] ?? 0);
-            }
+        $payload = [];
+
+        if (array_key_exists('lead_id', $data)) {
+            $payload['lead_id'] = $data['lead_id'];
         }
 
-        $supplies = $report->supplies_used ?? [];
-        foreach ($supplies as $item) {
-            $suppliesCost += intval($item['quantity']) * floatval($item['unit_price'] ?? 0);
+        if (array_key_exists('user_id', $data)) {
+            $payload['user_id'] = $data['user_id'];
         }
 
-        $totalCost = $servicesCost + $suppliesCost;
+        if (array_key_exists('clinic_id', $data)) {
+            $payload['clinic_id'] = $data['clinic_id'];
+        }
 
-        return Invoice::create([
-            'lead_id'        => $report->lead_id,
-            'clinic_id'      => $report->clinic_id,
-            'report_id'      => $report->id,
-            'invoice_number' => 'INV-' . strtoupper(uniqid()),
-            'services_cost'  => $servicesCost,
-            'supplies_cost'  => $suppliesCost,
-            'total_cost'     => $totalCost,
-            'amount_paid'    => 0,
-            'status'         => 'unpaid',
-            'issued_at'      => now(),
-            'due_date'       => now()->addDays(30),
-        ]);
+        if (array_key_exists('visit_date', $data)) {
+            $payload['scheduled_date'] = $data['visit_date'];
+        }
+
+        if (array_key_exists('status', $data)) {
+            $payload['status'] = $data['status'];
+        } elseif (! isset($payload['status'])) {
+            $payload['status'] = 'scheduled';
+        }
+
+        return $payload;
     }
 }

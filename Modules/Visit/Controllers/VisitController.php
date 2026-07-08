@@ -23,13 +23,7 @@ class VisitController extends Controller
 
     public function show(ShowVisitRequest $request, Visit $visit): JsonResponse
     {
-        $report = $visit->report;
-
-        if (!$report) {
-            return response()->json(['message' => 'Report not found for this visit.'], 404);
-        }
-
-        return response()->json($this->service->get($report->id, $request->user()));
+        return response()->json($this->service->get($visit->id, $request->user()));
     }
 
     public function store(StoreVisitRequest $request): JsonResponse
@@ -43,14 +37,8 @@ class VisitController extends Controller
 
     public function update(UpdateVisitRequest $request, Visit $visit): JsonResponse
     {
-        $report = $visit->report;
-
-        if (!$report) {
-            return response()->json(['message' => 'Report not found for this visit.'], 404);
-        }
-
         try {
-            return response()->json($this->service->update($report, $request->validated()));
+            return response()->json($this->service->update($visit, $request->validated()));
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -58,13 +46,7 @@ class VisitController extends Controller
 
     public function destroy(DestroyVisitRequest $request, Visit $visit): JsonResponse
     {
-        $report = $visit->report;
-
-        if (!$report) {
-            return response()->json(null, 204);
-        }
-
-        $this->service->delete($report);
+        $this->service->delete($visit);
         return response()->json(null, 204);
     }
 }

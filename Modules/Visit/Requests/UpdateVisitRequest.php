@@ -29,7 +29,7 @@ class UpdateVisitRequest extends FormRequest
             'supplies_used.*.unit_price'          => 'required_with:supplies_used|numeric|min:0',
             'cost_known'                          => 'boolean',
             'body'                                => 'nullable|string',
-            'status'                              => 'sometimes|in:active,completed,cancelled',
+            'status'                              => 'sometimes|in:scheduled,confirmed,completed,cancelled,missed',
         ];
     }
 }
