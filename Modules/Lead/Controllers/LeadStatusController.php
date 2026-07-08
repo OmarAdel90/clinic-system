@@ -43,6 +43,14 @@ class LeadStatusController extends Controller
     {
         $payload = $request->validated();
 
+        if (array_key_exists('key', $payload) && blank($payload['key'])) {
+            unset($payload['key']);
+        }
+
+        if (array_key_exists('color', $payload) && blank($payload['color'])) {
+            $payload['color'] = null;
+        }
+
         if (array_key_exists('label', $payload) && ! array_key_exists('key', $payload)) {
             $payload['key'] = $leadStatus->key ?: Str::slug($payload['label']);
         }
