@@ -18,6 +18,7 @@ require __DIR__ . '/modules/invoice.php';
 require __DIR__ . '/modules/treatment-plan.php';
 require __DIR__ . '/modules/crm.php';
 require __DIR__ . '/modules/lead.php';
+require __DIR__ . '/modules/lead-status.php';
 require __DIR__ . '/modules/auth.php';
 require __DIR__ . '/modules/patient.php';
 require __DIR__ . '/modules/clinic.php';
