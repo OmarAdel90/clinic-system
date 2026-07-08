@@ -59,6 +59,50 @@ class AgentController extends Controller
         return response()->json($followups);
     }
 
+    public function messages(Request $request, Conversation $conversation): JsonResponse
+    {
+        $actor = $request->user();
+
+        abort_unless(
+            $conversation->assigned_user_id === $actor->id || $actor->can('view_any_user'),
+            403,
+            'You are not allowed to view this conversation.',
+        );
+
+        $messages = Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->with('user')
+            ->latest('sent_at')
+            ->latest('created_at')
+            ->take(100)
+            ->get()
+            ->reverse()
+            ->values();
+
+        return response()->json($messages);
+    }
+
+    public function completeFollowup(Request $request, FollowUp $followup): JsonResponse
+    {
+        $actor = $request->user();
+
+        abort_unless(
+            $followup->user_id === $actor->id || $actor->can('view_any_user'),
+            403,
+            'You are not allowed to update this follow-up.',
+        );
+
+        if (! $followup->completed_at) {
+            $followup->forceFill([
+                'completed_at' => now(),
+            ])->save();
+        }
+
+        return response()->json(
+            $followup->fresh(['conversation.lead'])
+        );
+    }
+
     public function sendMessage(Request $request, MetaWhatsAppService $whatsapp, MetaFacebookService $facebook): JsonResponse
     {
         $request->validate([
@@ -69,6 +113,12 @@ class AgentController extends Controller
         ]);
 
         $conversation = Conversation::findOrFail($request->conversation_id);
+        abort_unless(
+            $conversation->assigned_user_id === auth()->id() || $request->user()->can('view_any_user'),
+            403,
+            'You are not allowed to send messages in this conversation.',
+        );
+
         $lead = $conversation->lead;
         $platform = $conversation->platform;
 
