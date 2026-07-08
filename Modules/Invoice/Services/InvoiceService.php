@@ -109,6 +109,14 @@ class InvoiceService
     public function update(Invoice $invoice, array $data): Invoice
     {
         try {
+            $newTotal = array_key_exists('total_cost', $data) ? floatval($data['total_cost']) : $invoice->total_cost;
+            $newPaid = array_key_exists('amount_paid', $data) ? floatval($data['amount_paid']) : $invoice->amount_paid;
+
+            if ($newPaid > $newTotal) {
+                throw new \InvalidArgumentException('Amount paid cannot exceed total cost.');
+            }
+
+            $data['status'] = $this->resolveStatus($newPaid, $newTotal);
             $invoice->update($data);
             return $invoice->fresh();
         } catch (QueryException $e) {
@@ -131,5 +139,18 @@ class InvoiceService
             Log::critical(__METHOD__ . ' encountered an unexpected error', ['error' => $e->getMessage()]);
             throw $e;
         }
+    }
+
+    protected function resolveStatus(float $amountPaid, float $totalCost): string
+    {
+        if ($amountPaid <= 0) {
+            return 'unpaid';
+        }
+
+        if ($amountPaid >= $totalCost) {
+            return 'paid';
+        }
+
+        return 'partial';
     }
 }

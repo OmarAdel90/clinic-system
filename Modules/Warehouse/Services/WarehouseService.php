@@ -207,6 +207,45 @@ class WarehouseService
         }
     }
 
+    public function addInventory(int $warehouseId, array $supplies): void
+    {
+        try {
+            if (empty($supplies)) {
+                return;
+            }
+
+            foreach ($supplies as $item) {
+                $qty = intval($item['quantity'] ?? 0);
+                if ($qty <= 0) {
+                    continue;
+                }
+
+                $inventory = WarehouseInventory::where('warehouse_id', $warehouseId)
+                    ->where('sku', $item['sku'])
+                    ->first();
+
+                if (! $inventory) {
+                    $inventory = WarehouseInventory::create([
+                        'warehouse_id' => $warehouseId,
+                        'sku' => $item['sku'],
+                        'name' => $item['name'] ?? $item['sku'],
+                        'arabic_name' => $item['arabic_name'] ?? null,
+                        'quantity' => 0,
+                        'reserved_quantity' => 0,
+                    ]);
+                }
+
+                $inventory->increment('quantity', $qty);
+            }
+        } catch (QueryException $e) {
+            Log::error(__METHOD__.' failed', ['warehouse_id' => $warehouseId, 'error' => $e->getMessage()]);
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::critical(__METHOD__.' encountered an unexpected error', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
     public function releaseReserved(int $warehouseId, array $supplies): void
     {
         try {

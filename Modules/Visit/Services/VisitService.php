@@ -3,6 +3,8 @@
 namespace Modules\Visit\Services;
 
 use Modules\Auth\Models\User;
+use Modules\Invoice\Models\Invoice;
+use Modules\TreatmentPlan\Models\TreatmentPlan;
 use Modules\Visit\Models\Visit;
 use Modules\Warehouse\Services\WarehouseService;
 use Illuminate\Support\Facades\DB;
@@ -130,6 +132,19 @@ class VisitService
         try {
             DB::transaction(function () use ($visit) {
                 $report = $visit->report;
+                $warehouseId = $visit->clinic_id
+                    ? $this->warehouseService->getWarehouseIdForClinic($visit->clinic_id)
+                    : null;
+
+                if ($warehouseId) {
+                    if (in_array($visit->status, ['scheduled', 'confirmed'], true)) {
+                        $this->warehouseService->releaseReserved($warehouseId, $visit->supplies_reserved ?? []);
+                    }
+
+                    if ($visit->status === 'completed' && ! empty($report?->supplies_used)) {
+                        $this->warehouseService->addInventory($warehouseId, $report->supplies_used ?? []);
+                    }
+                }
 
                 if ($report?->invoice) {
                     $report->invoice->delete();
@@ -140,6 +155,10 @@ class VisitService
                 }
 
                 $visit->delete();
+
+                if ($visit->treatment_plan_id) {
+                    $this->refreshTreatmentPlanBilling($visit->treatment_plan_id);
+                }
             });
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['model_id' => $visit->id, 'error' => $e->getMessage()]);
@@ -148,6 +167,59 @@ class VisitService
             Log::critical(__METHOD__ . ' encountered an unexpected error', ['error' => $e->getMessage()]);
             throw $e;
         }
+    }
+
+    protected function refreshTreatmentPlanBilling(int $treatmentPlanId): void
+    {
+        $plan = TreatmentPlan::find($treatmentPlanId);
+
+        if (! $plan) {
+            return;
+        }
+
+        $completedVisits = Visit::where('treatment_plan_id', $treatmentPlanId)
+            ->where('status', 'completed')
+            ->get();
+
+        $invoice = Invoice::where('treatment_plan_id', $treatmentPlanId)->first();
+        $totalCost = $completedVisits->sum('total_cost');
+
+        if ($completedVisits->isEmpty()) {
+            if ($invoice) {
+                $invoice->delete();
+            }
+
+            $plan->update(['status' => 'active']);
+            return;
+        }
+
+        if ($invoice) {
+            if ($invoice->amount_paid > $totalCost) {
+                throw new \RuntimeException('Cannot reduce treatment plan invoice below the amount already paid.');
+            }
+
+            $invoice->update([
+                'total_cost' => $totalCost,
+                'status' => $this->resolveInvoiceStatus($invoice->amount_paid, $totalCost),
+            ]);
+        }
+
+        $plan->update([
+            'status' => $completedVisits->count() >= $plan->total_visits ? 'completed' : 'active',
+        ]);
+    }
+
+    protected function resolveInvoiceStatus(float $amountPaid, float $totalCost): string
+    {
+        if ($amountPaid <= 0) {
+            return 'unpaid';
+        }
+
+        if ($amountPaid >= $totalCost) {
+            return 'paid';
+        }
+
+        return 'partial';
     }
 
     protected function mapVisitPayload(array $data): array
