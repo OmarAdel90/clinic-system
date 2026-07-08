@@ -6,14 +6,20 @@ use App\Http\Controllers\Controller;
 use Modules\CRM\Models\Conversation;
 use Modules\CRM\Models\FollowUp;
 use Modules\CRM\Models\Message;
+use Modules\CRM\Services\PerformanceMetricsService;
 use Modules\CRM\Services\MetaFacebookService;
 use Modules\CRM\Services\MetaWhatsAppService;
+use Modules\Auth\Models\User;
 use Modules\Lead\Models\Lead;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AgentController extends Controller
 {
+    public function __construct(
+        protected PerformanceMetricsService $performanceMetricsService,
+    ) {}
+
     public function conversations(): JsonResponse
     {
         $user = auth()->user();
@@ -119,5 +125,17 @@ class AgentController extends Controller
             'api_response' => $result,
             'messages'     => $messages,
         ]);
+    }
+
+    public function metrics(Request $request): JsonResponse
+    {
+        $actor = $request->user();
+        $targetUser = $actor;
+
+        if ($request->filled('user_id') && $actor->can('view_any_user')) {
+            $targetUser = User::findOrFail($request->integer('user_id'));
+        }
+
+        return response()->json($this->performanceMetricsService->getForUser($targetUser));
     }
 }
