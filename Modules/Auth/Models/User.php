@@ -31,6 +31,7 @@ class User extends Authenticatable
         'role_id',
         'location',
         'salary',
+        'commission',
         'title',
         'specialization',
         'hired_at',

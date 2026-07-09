@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Log;
 
 class UserService
 {
+    private const PROTECTED_ADMIN_EMAIL = 'super@clinic.com';
+
     public function getAll(): Collection
     {
         try {
@@ -106,6 +108,10 @@ class UserService
     public function delete(User $user): void
     {
         try {
+            if ($user->email === self::PROTECTED_ADMIN_EMAIL) {
+                throw new \Exception('The seeded admin user cannot be deleted.', 422);
+            }
+
             $user->delete();
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['model_id' => $user->id, 'error' => $e->getMessage()]);

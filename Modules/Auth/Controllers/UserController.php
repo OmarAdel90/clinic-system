@@ -44,8 +44,13 @@ class UserController extends Controller
 
     public function destroy(User $user): JsonResponse
     {
-        $this->service->delete($user);
-        return response()->json('User deleted', 204);
+        try {
+            $this->service->delete($user);
+
+            return response()->json('User deleted', 204);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage(), 'status' => 'error'], $e->getCode() ?: 500);
+        }
     }
 
     public function syncRoles(SyncUserRolesRequest $request, User $user): JsonResponse

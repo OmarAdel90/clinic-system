@@ -12,11 +12,19 @@ class AuthController extends Controller
 {
     public function login(LoginRequest $request): JsonResponse
     {
-        $user = User::where('email', $request->input('email'))->first();
+        $login = trim((string) $request->input('login', $request->input('email')));
+
+        $user = User::query()
+            ->where('email', $login)
+            ->orWhere('phone_number', $login)
+            ->first();
+
         $passwordValid = $user && Hash::check($request->input('password'), $user->password ?? '');
         if (! $passwordValid) {
             return response()->json(['message' => 'Invalid credentials.'], 401);
         }
+
+        $user->tokens()->delete();
 
         $token = $user->createToken('auth_token', ['*'], now()->addMinutes(config('sanctum.expiration')));
 
