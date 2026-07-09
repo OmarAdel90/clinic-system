@@ -27,7 +27,7 @@ class UpdateClinicRequest extends FormRequest
             'doctors.*'           => 'sometimes|integer|exists:users,id',
             'services'            => 'sometimes|array',
             'services.*'          => 'sometimes|string|max:255',
-            'warehouse_id'        => 'sometimes|exists:warehouses,id'
+            'warehouse_id'        => 'sometimes|nullable|exists:warehouses,id'
         ];
     }
 }
