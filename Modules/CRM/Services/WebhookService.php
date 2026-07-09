@@ -95,6 +95,10 @@ class WebhookService
             return;
         }
 
+        if ($messageId && Message::where('wa_message_id', $messageId)->exists()) {
+            return;
+        }
+
         $lead = Lead::firstOrCreate(
             ['whatsapp_id' => $waId],
             [
