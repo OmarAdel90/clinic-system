@@ -24,7 +24,7 @@ class LeadService
                 'clinicAssignedBy',
                 'assignmentState.user',
                 'conversations',
-            ]);
+            ])->withCount('medicalRecords');
 
             if ($user && !$user->can('view_any_lead')) {
                 $leadIds = $user->assignedConversations()->pluck('lead_id');
@@ -51,7 +51,7 @@ class LeadService
                 'clinicAssignedBy',
                 'assignmentState.user',
                 'conversations',
-            ]);
+            ])->withCount('medicalRecords');
 
             if ($user && !$user->can('view_any_lead')) {
                 $leadIds = $user->assignedConversations()->pluck('lead_id');
@@ -86,7 +86,7 @@ class LeadService
                     'clinicAssignedBy',
                     'assignmentState.user',
                     'conversations',
-                ]);
+                ])->loadCount('medicalRecords');
             });
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['error' => $e->getMessage(), 'data' => $data]);
@@ -143,7 +143,7 @@ class LeadService
                     'clinicAssignedBy',
                     'assignmentState.user',
                     'conversations',
-                ]);
+                ])->loadCount('medicalRecords');
             });
         } catch (ModelNotFoundException $e) {
             Log::warning(__METHOD__ . ' model not found', ['lead_id' => $lead->id, 'clinic_id' => $clinicId]);

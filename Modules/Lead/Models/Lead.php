@@ -9,6 +9,7 @@ use Modules\Clinic\Models\Clinic;
 use Modules\CRM\Models\Campaign;
 use Modules\CRM\Models\Conversation;
 use Modules\CRM\Models\AssignmentState;
+use Modules\Patient\Models\MedicalRecord;
 
 class Lead extends Model
 {
@@ -61,5 +62,10 @@ class Lead extends Model
     public function assignmentState()
     {
         return $this->hasOne(AssignmentState::class);
+    }
+
+    public function medicalRecords()
+    {
+        return $this->hasMany(MedicalRecord::class);
     }
 }
