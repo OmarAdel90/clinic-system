@@ -15,7 +15,7 @@ class StoreClinicRequest extends FormRequest
     {
         return [
             'name'                => 'required|string|max:255|unique:clinics,name',
-            'arabic_name'         => 'required|string|max:255|unique:clinics,arabic_name',
+            'arabic_name'         => ['required', 'string', 'max:255', 'unique:clinics,arabic_name', 'regex:/^(?=.*\p{Arabic})[\p{Arabic}\s\-\d]+$/u'],
             'phone_number'        => 'required|string|max:50',
             'address'             => 'required|string|max:500',
             'provides_medication' => 'required|boolean',
