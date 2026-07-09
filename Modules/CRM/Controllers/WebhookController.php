@@ -18,6 +18,13 @@ class WebhookController extends Controller
         $token = $request->query('hub.verify_token', $request->query('hub_verify_token'));
         $challenge = $request->query('hub.challenge', $request->query('hub_challenge'));
 
+        Log::info('Meta webhook verify hit', [
+            'query' => $request->query(),
+            'headers' => $request->headers->all(),
+            'ip' => $request->ip(),
+            'url' => $request->fullUrl(),
+        ]);
+
         if ($mode === 'subscribe' && $this->service->verifyToken($token)) {
             return response($challenge, 200)->header('Content-Type', 'text/plain');
         }
