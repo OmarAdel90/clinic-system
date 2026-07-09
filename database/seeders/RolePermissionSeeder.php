@@ -16,6 +16,7 @@ class RolePermissionSeeder extends Seeder
 
         $models = [
             'assignment_state',
+            'call_center_queue_entry',
             'call_center_performance_metrics',
             'campaign',
             'campaign_cost',

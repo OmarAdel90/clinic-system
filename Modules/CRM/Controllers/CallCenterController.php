@@ -3,6 +3,9 @@
 namespace Modules\CRM\Controllers;
 
 use App\Http\Controllers\Controller;
+use Modules\CRM\Requests\DestroyCallCenterQueueEntryRequest;
+use Modules\CRM\Requests\IndexCallCenterQueueRequest;
+use Modules\CRM\Requests\StoreCallCenterQueueEntryRequest;
 use Modules\Lead\Requests\AssignLeadRequest;
 use Modules\CRM\Services\CallCenterService;
 use Illuminate\Http\JsonResponse;
@@ -11,12 +14,12 @@ class CallCenterController extends Controller
 {
     public function __construct(protected CallCenterService $service) {}
 
-    public function queue(): JsonResponse
+    public function queue(IndexCallCenterQueueRequest $request): JsonResponse
     {
         return response()->json($this->service->getQueue());
     }
 
-    public function nextInQueue(): JsonResponse
+    public function nextInQueue(IndexCallCenterQueueRequest $request): JsonResponse
     {
         $user = $this->service->getNextInQueue();
 
@@ -62,7 +65,7 @@ class CallCenterController extends Controller
         }
     }
 
-    public function addToQueue(int $userId): JsonResponse
+    public function addToQueue(StoreCallCenterQueueEntryRequest $request, int $userId): JsonResponse
     {
         try {
             $entry = $this->service->addToQueue($userId);
@@ -72,7 +75,7 @@ class CallCenterController extends Controller
         }
     }
 
-    public function removeFromQueue(int $userId): JsonResponse
+    public function removeFromQueue(DestroyCallCenterQueueEntryRequest $request, int $userId): JsonResponse
     {
         $this->service->removeFromQueue($userId);
         return response()->json(null, 204);

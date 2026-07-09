@@ -10,6 +10,16 @@ use Modules\Auth\Requests\LoginRequest;
 
 class AuthController extends Controller
 {
+    protected function serializeUser(User $user): array
+    {
+        $user->loadMissing('roles');
+
+        return array_merge($user->toArray(), [
+            'roles' => $user->roles->map->only(['id', 'name', 'guard_name']),
+            'permissions' => $user->getAllPermissions()->map->only(['id', 'name', 'guard_name'])->values(),
+        ]);
+    }
+
     public function login(LoginRequest $request): JsonResponse
     {
         $login = trim((string) $request->input('login', $request->input('email')));
@@ -28,10 +38,8 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token', ['*'], now()->addMinutes(config('sanctum.expiration')));
 
-        $user->loadMissing('roles');
-
         return response()->json([
-            'user' => $user,
+            'user' => $this->serializeUser($user),
             'token' => $token->plainTextToken,
             'token_type' => 'Bearer',
         ]);
@@ -39,9 +47,9 @@ class AuthController extends Controller
 
     public function me(): JsonResponse
     {
-        $user = auth()->user()->loadMissing('roles');
+        $user = auth()->user();
 
-        return response()->json(array_merge($user->toArray(), ['roles' => $user->roles->map->only(['id', 'name', 'guard_name'])]));
+        return response()->json($this->serializeUser($user));
     }
 
     public function logout(): JsonResponse
