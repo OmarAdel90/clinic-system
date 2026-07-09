@@ -17,6 +17,7 @@ class UpdateClinicRequest extends FormRequest
 
         return [
             'name'                => 'sometimes|required|string|max:255|unique:clinics,name,' . $clinicId,
+            'arabic_name'         => 'sometimes|required|string|max:255|unique:clinics,arabic_name,' . $clinicId,
             'phone_number'        => 'sometimes|string|max:50',
             'address'             => 'sometimes|string|max:500',
             'provides_medication' => 'sometimes|boolean',
