@@ -53,7 +53,7 @@ class Message extends Model
 
     public function contact()
     {
-        return $this->belongsTo(Lead::class, 'Lead_id');
+        return $this->belongsTo(Lead::class, 'lead_id');
     }
 
     public function replyTo()
