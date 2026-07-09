@@ -16,7 +16,6 @@ class StoreTransactionRequest extends FormRequest
         return [
             'warehouse_id'                  => 'required|integer|exists:warehouses,id',
             'supplier_id'                   => 'required|integer|exists:suppliers,id',
-            'batch_number'                  => 'required|string|max:100',
             'items_bought'                  => 'required|array',
             'items_bought.*.sku'            => 'required|string|max:100|exists:pharmaceuticals,SKU',
             'items_bought.*.name'           => 'required|string|max:255',
@@ -48,12 +47,4 @@ class StoreTransactionRequest extends FormRequest
         });
     }
 
-    protected function prepareForValidation(): void
-    {
-        if (!$this->has('batch_number')) {
-            $this->merge([
-                'batch_number' => 'BATCH-' . strtoupper(uniqid()),
-            ]);
-        }
-    }
 }

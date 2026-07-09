@@ -147,7 +147,6 @@ class TransactionService
         SupplierPaymentHistory::create([
             'transaction_id' => $transaction->transaction_id,
             'supplier_id'    => $transaction->supplier_id,
-            'batch_id'       => $transaction->batch_number ?? ('BATCH-' . strtoupper(uniqid())),
             'total_amount'   => $totalAmount,
             'total_paid'     => 0,
             'payment_status' => 'unpaid',
@@ -260,7 +259,6 @@ class TransactionService
         if ($payment) {
             $payment->update([
                 'total_amount' => $totalAmount,
-                'batch_id'     => $transaction->batch_number ?? $payment->batch_id,
             ]);
         }
     }

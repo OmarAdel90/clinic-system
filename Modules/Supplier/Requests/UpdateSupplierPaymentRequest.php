@@ -16,7 +16,6 @@ class UpdateSupplierPaymentRequest extends FormRequest
         return [
             'transaction_id' => 'sometimes|required|string|exists:warehouse_supplier_transactions,transaction_id',
             'supplier_id'    => 'sometimes|required|integer|exists:suppliers,id',
-            'batch_id'       => 'sometimes|required|string|max:100',
             'total_amount'   => 'sometimes|required|numeric|min:0',
             'total_paid'     => 'sometimes|required|numeric|min:0',
             'payment_status' => 'sometimes|required|in:unpaid,partial,paid',

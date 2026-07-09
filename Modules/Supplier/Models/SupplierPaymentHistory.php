@@ -14,7 +14,6 @@ class SupplierPaymentHistory extends Model
     protected $fillable = [
         'transaction_id',
         'supplier_id',
-        'batch_id',
         'total_amount',
         'total_paid',
         'payment_status'

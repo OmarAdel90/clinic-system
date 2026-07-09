@@ -16,7 +16,6 @@ class UpdateTransactionRequest extends FormRequest
         return [
             'warehouse_id'                  => 'sometimes|integer|exists:warehouses,id',
             'supplier_id'                   => 'sometimes|integer|exists:suppliers,id',
-            'batch_number'                  => 'sometimes|string|max:100',
             'items_bought'                  => 'sometimes|required|array',
             'items_bought.*.sku'            => 'required_with:items_bought|string|max:100|exists:pharmaceuticals,SKU',
             'items_bought.*.name'           => 'required_with:items_bought|string|max:255',

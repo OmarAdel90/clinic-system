@@ -17,7 +17,6 @@ class WarehouseSupplierTransaction extends Model
     protected $fillable = [
         'warehouse_id',
         'supplier_id',
-        'batch_number',
         'items_bought',
         'transaction_date'
     ];
