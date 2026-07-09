@@ -4,6 +4,7 @@ namespace Modules\Lead\Services;
 
 use Modules\Auth\Models\User;
 use Modules\Clinic\Models\Clinic;
+use Modules\CRM\Services\CallCenterService;
 use Modules\Lead\Models\Lead;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -73,7 +74,20 @@ class LeadService
     public function create(array $data): Lead
     {
         try {
-            return Lead::create($data);
+            return DB::transaction(function () use ($data) {
+                $lead = Lead::create($data);
+
+                app(CallCenterService::class)->assignNextLead($lead->id);
+
+                return $lead->fresh([
+                    'leadStatus',
+                    'campaign',
+                    'clinic',
+                    'clinicAssignedBy',
+                    'assignmentState.user',
+                    'conversations',
+                ]);
+            });
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['error' => $e->getMessage(), 'data' => $data]);
             throw $e;

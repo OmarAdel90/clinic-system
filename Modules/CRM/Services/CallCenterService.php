@@ -120,13 +120,19 @@ class CallCenterService
                     ['user_id' => $user->id]
                 );
 
-                $conversation = Conversation::where('lead_id', $lead->id)->first();
-                if ($conversation) {
-                    $conversation->update([
-                        'assigned_user_id'  => $user->id,
-                        'last_message_time' => now(),
-                    ]);
-                }
+                $conversation = Conversation::firstOrCreate(
+                    ['lead_id' => $lead->id],
+                    [
+                        'platform' => $lead->platform,
+                        'first_message_time' => now(),
+                    ]
+                );
+
+                $conversation->update([
+                    'assigned_user_id'  => $user->id,
+                    'last_message_time' => now(),
+                    'platform' => $conversation->platform ?: $lead->platform,
+                ]);
 
                 $this->moveToBack($user->id);
 
@@ -156,13 +162,19 @@ class CallCenterService
                     ['user_id' => $user->id]
                 );
 
-                $conversation = Conversation::where('lead_id', $lead->id)->first();
-                if ($conversation) {
-                    $conversation->update([
-                        'assigned_user_id'  => $user->id,
-                        'last_message_time' => now(),
-                    ]);
-                }
+                $conversation = Conversation::firstOrCreate(
+                    ['lead_id' => $lead->id],
+                    [
+                        'platform' => $lead->platform,
+                        'first_message_time' => now(),
+                    ]
+                );
+
+                $conversation->update([
+                    'assigned_user_id'  => $user->id,
+                    'last_message_time' => now(),
+                    'platform' => $conversation->platform ?: $lead->platform,
+                ]);
 
                 return $user;
             });
