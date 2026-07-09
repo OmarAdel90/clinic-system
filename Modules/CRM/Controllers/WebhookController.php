@@ -14,6 +14,8 @@ class WebhookController extends Controller
 
     public function verify(Request $request): JsonResponse|string
     {
+        abort(418, 'meta-test');
+
         $mode = $request->query('hub.mode', $request->query('hub_mode'));
         $token = $request->query('hub.verify_token', $request->query('hub_verify_token'));
         $challenge = $request->query('hub.challenge', $request->query('hub_challenge'));
