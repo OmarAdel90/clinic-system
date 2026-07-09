@@ -37,7 +37,8 @@ return [
 
     'meta_whatsapp' => [
         'access_token'     => env('META_WHATSAPP_ACCESS_TOKEN'),
-        'phone_number_id'  => env('META_WABA_ID'),
+        'phone_number_id'  => env('META_PHONE_NUMBER_ID', env('META_WABA_ID')),
+        'waba_id'          => env('META_WABA_ID'),
         'api_version'      => env('META_API_VERSION', 'v20.0'),
         'verify_token'     => env('META_WHATSAPP_VERIFY_TOKEN', 'clinic_verify'),
     ],

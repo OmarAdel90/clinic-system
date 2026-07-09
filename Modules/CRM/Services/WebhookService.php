@@ -26,7 +26,12 @@ class WebhookService
 
     public function verifyToken(string $token): bool
     {
-        return $token === config('services.meta_whatsapp.verify_token');
+        $validTokens = array_filter([
+            config('services.meta_whatsapp.verify_token'),
+            config('services.meta_facebook.verify_token'),
+        ], fn ($value) => filled($value));
+
+        return in_array($token, $validTokens, true);
     }
 
     public function process(array $payload, array $headers): void
