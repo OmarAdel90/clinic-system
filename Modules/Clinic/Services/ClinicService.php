@@ -82,6 +82,15 @@ class ClinicService
     {
         try {
             return DB::transaction(function () use ($clinic, $data, $confirmReassign) {
+                $providesMedication = array_key_exists('provides_medication', $data)
+                    ? (bool) $data['provides_medication']
+                    : (bool) $clinic->provides_medication;
+
+                if (! $providesMedication) {
+                    Warehouse::where('clinic_id', $clinic->id)->update(['clinic_id' => null]);
+                    unset($data['warehouse_id']);
+                }
+
                 if (array_key_exists('warehouse_id', $data)) {
                     $warehouseId = $data['warehouse_id'];
                     unset($data['warehouse_id']);
@@ -90,6 +99,7 @@ class ClinicService
                         Warehouse::where('clinic_id', $clinic->id)->update(['clinic_id' => null]);
                     } else {
                         $currentOwner = Warehouse::where('id', $warehouseId)
+                            ->with('clinic')
                             ->whereNotNull('clinic_id')
                             ->where('clinic_id', '!=', $clinic->id)
                             ->first();
@@ -99,6 +109,8 @@ class ClinicService
                                 'conflict' => true,
                                 'warehouse_id' => $warehouseId,
                                 'current_clinic_id' => $currentOwner->clinic_id,
+                                'warehouse_name' => $currentOwner->name,
+                                'current_clinic_name' => $currentOwner->clinic?->name,
                             ];
                         }
 

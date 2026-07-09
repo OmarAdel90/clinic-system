@@ -38,11 +38,16 @@ class ClinicController extends Controller
         $result = $this->service->update($clinic, $request->validated(), $request->boolean('confirm_reassign'));
 
         if (is_array($result) && ($result['conflict'] ?? false)) {
+            $warehouseName = $result['warehouse_name'] ?? "Warehouse {$result['warehouse_id']}";
+            $clinicName = $result['current_clinic_name'] ?? "Clinic {$result['current_clinic_id']}";
+
             return response()->json([
-                'message' => "Warehouse {$result['warehouse_id']} is already assigned to clinic {$result['current_clinic_id']}.",
+                'message' => "{$warehouseName} is already assigned to {$clinicName}.",
                 'conflict' => [
                     'warehouse_id' => $result['warehouse_id'],
                     'current_clinic_id' => $result['current_clinic_id'],
+                    'warehouse_name' => $result['warehouse_name'] ?? null,
+                    'current_clinic_name' => $result['current_clinic_name'] ?? null,
                 ],
             ], 409);
         }
