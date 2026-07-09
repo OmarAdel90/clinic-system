@@ -11,9 +11,6 @@ class WarehouseSupplierTransaction extends Model
 {
     use HasFactory;
 
-    public $incrementing = false;
-    protected $primaryKey = 'transaction_id';
-    protected $keyType = 'string';
     protected $fillable = [
         'warehouse_id',
         'supplier_id',
@@ -24,15 +21,6 @@ class WarehouseSupplierTransaction extends Model
         'transaction_date' => 'datetime',
         'items_bought' => 'array'
     ];
-
-    protected static function booted()
-    {
-        static::creating(function ($model) {
-            if (empty($model->transaction_id)) {
-                $model->transaction_id = (string) \Illuminate\Support\Str::uuid();
-            }
-        });
-    }
 
     public function warehouse()
     {

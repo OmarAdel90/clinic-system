@@ -8,31 +8,53 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('warehouse_supplier_transactions', function (Blueprint $table) {
-            if (Schema::hasColumn('warehouse_supplier_transactions', 'batch_number')) {
-                $table->dropColumn('batch_number');
-            }
+        Schema::dropIfExists('supplier_payment_history');
+        Schema::dropIfExists('warehouse_supplier_transactions');
+
+        Schema::create('warehouse_supplier_transactions', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('warehouse_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
+            $table->json('items_bought')->nullable();
+            $table->timestamp('transaction_date')->nullable();
+            $table->timestamps();
         });
 
-        Schema::table('supplier_payment_history', function (Blueprint $table) {
-            if (Schema::hasColumn('supplier_payment_history', 'batch_id')) {
-                $table->dropColumn('batch_id');
-            }
+        Schema::create('supplier_payment_history', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('transaction_id')->nullable()->constrained('warehouse_supplier_transactions')->nullOnDelete();
+            $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
+            $table->decimal('total_amount', 12, 2)->nullable();
+            $table->decimal('total_paid', 12, 2)->nullable();
+            $table->string('payment_status')->nullable();
+            $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::table('warehouse_supplier_transactions', function (Blueprint $table) {
-            if (!Schema::hasColumn('warehouse_supplier_transactions', 'batch_number')) {
-                $table->string('batch_number')->nullable()->after('supplier_id');
-            }
+        Schema::dropIfExists('supplier_payment_history');
+        Schema::dropIfExists('warehouse_supplier_transactions');
+
+        Schema::create('warehouse_supplier_transactions', function (Blueprint $table) {
+            $table->string('transaction_id')->primary();
+            $table->foreignId('warehouse_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
+            $table->string('batch_number')->nullable();
+            $table->json('items_bought')->nullable();
+            $table->timestamp('transaction_date')->nullable();
+            $table->timestamps();
         });
 
-        Schema::table('supplier_payment_history', function (Blueprint $table) {
-            if (!Schema::hasColumn('supplier_payment_history', 'batch_id')) {
-                $table->string('batch_id')->nullable()->after('supplier_id');
-            }
+        Schema::create('supplier_payment_history', function (Blueprint $table) {
+            $table->id();
+            $table->string('transaction_id')->nullable();
+            $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
+            $table->string('batch_id')->nullable();
+            $table->decimal('total_amount', 12, 2)->nullable();
+            $table->decimal('total_paid', 12, 2)->nullable();
+            $table->string('payment_status')->nullable();
+            $table->timestamps();
         });
     }
 };

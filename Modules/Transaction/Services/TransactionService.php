@@ -26,7 +26,7 @@ class TransactionService
         }
     }
 
-    public function get(string $transactionId): WarehouseSupplierTransaction
+    public function get(int $transactionId): WarehouseSupplierTransaction
     {
         try {
             return WarehouseSupplierTransaction::with(['warehouse', 'supplier'])
@@ -97,7 +97,7 @@ class TransactionService
             DB::transaction(function () use ($transaction) {
                 $this->reverseInventory($transaction);
 
-                SupplierPaymentHistory::where('transaction_id', $transaction->transaction_id)->delete();
+                SupplierPaymentHistory::where('transaction_id', $transaction->id)->delete();
 
                 $transaction->delete();
             });
@@ -145,7 +145,7 @@ class TransactionService
         }
 
         SupplierPaymentHistory::create([
-            'transaction_id' => $transaction->transaction_id,
+            'transaction_id' => $transaction->id,
             'supplier_id'    => $transaction->supplier_id,
             'total_amount'   => $totalAmount,
             'total_paid'     => 0,
@@ -255,7 +255,7 @@ class TransactionService
             $totalAmount += intval($item['quantity']) * floatval($item['price'] ?? 0);
         }
 
-        $payment = SupplierPaymentHistory::where('transaction_id', $transaction->transaction_id)->first();
+        $payment = SupplierPaymentHistory::where('transaction_id', $transaction->id)->first();
         if ($payment) {
             $payment->update([
                 'total_amount' => $totalAmount,

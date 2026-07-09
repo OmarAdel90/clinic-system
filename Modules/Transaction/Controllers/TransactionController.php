@@ -24,7 +24,7 @@ class TransactionController extends Controller
     public function show(ShowTransactionRequest $request, WarehouseSupplierTransaction $transaction): JsonResponse
     {
         return response()->json(
-            $this->service->get($transaction->transaction_id)
+            $this->service->get($transaction->id)
         );
     }
 

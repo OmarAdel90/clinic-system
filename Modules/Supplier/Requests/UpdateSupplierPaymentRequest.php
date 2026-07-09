@@ -14,7 +14,7 @@ class UpdateSupplierPaymentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'transaction_id' => 'sometimes|required|string|exists:warehouse_supplier_transactions,transaction_id',
+            'transaction_id' => 'sometimes|required|integer|exists:warehouse_supplier_transactions,id',
             'supplier_id'    => 'sometimes|required|integer|exists:suppliers,id',
             'total_amount'   => 'sometimes|required|numeric|min:0',
             'total_paid'     => 'sometimes|required|numeric|min:0',
