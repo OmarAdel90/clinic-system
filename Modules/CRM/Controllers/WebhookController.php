@@ -26,7 +26,7 @@ class WebhookController extends Controller
         ]);
 
         if ($mode === 'subscribe' && $this->service->verifyToken($token)) {
-            return response($challenge, 200)->header('Content-Type', 'text/plain');
+            return $challenge;
         }
 
         return response()->json(['message' => 'Verification failed.'], 403);
