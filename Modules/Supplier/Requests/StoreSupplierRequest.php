@@ -15,7 +15,7 @@ class StoreSupplierRequest extends FormRequest
     {
         return [
             'name'         => 'required|string|max:255',
-            'phone_number' => 'required|string|max:20',
+            'phone_number' => ['required', 'string', 'max:20', 'regex:/^\+?\d{7,20}$/'],
         ];
     }
 }

@@ -15,7 +15,7 @@ class UpdateSupplierRequest extends FormRequest
     {
         return [
             'name'         => 'sometimes|required|string|max:255',
-            'phone_number' => 'sometimes|required|string|max:20',
+            'phone_number' => ['sometimes', 'required', 'string', 'max:20', 'regex:/^\+?\d{7,20}$/'],
         ];
     }
 }

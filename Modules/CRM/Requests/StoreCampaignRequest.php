@@ -20,8 +20,8 @@ class StoreCampaignRequest extends FormRequest
             'start_date'  => 'nullable|date',
             'end_date'    => 'nullable|date|after_or_equal:start_date',
             'budget'      => 'nullable|numeric|min:0',
-            'currency'    => 'nullable|string|max:10',
-            'status'      => 'nullable|string|max:50',
+            'currency'    => ['nullable', 'string', 'size:3', 'regex:/^[A-Z]{3}$/'],
+            'status'      => 'nullable|in:draft,active,paused',
         ];
     }
 }
