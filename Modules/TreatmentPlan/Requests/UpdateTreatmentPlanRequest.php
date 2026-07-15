@@ -21,6 +21,8 @@ class UpdateTreatmentPlanRequest extends FormRequest
             'notes'                                       => 'nullable|string',
             'visits'                                      => 'nullable|array',
             'visits.*.scheduled_date'                     => 'required_with:visits|date',
+            'visits.*.service_name'                       => 'nullable|string|max:255',
+            'visits.*.service_cost'                       => 'nullable|numeric|min:0',
             'visits.*.supplies_reserved'                  => 'nullable|array',
             'visits.*.supplies_reserved.*.sku'            => 'required_with:visits.*.supplies_reserved|string|max:100',
             'visits.*.supplies_reserved.*.name'           => 'required_with:visits.*.supplies_reserved|string|max:255',

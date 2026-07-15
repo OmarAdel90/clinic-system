@@ -258,6 +258,14 @@ class VisitService
             $payload['supplies_reserved'] = $data['supplies_reserved'];
         }
 
+        if (array_key_exists('service_name', $data)) {
+            $payload['service_name'] = $data['service_name'];
+        }
+
+        if (array_key_exists('service_cost', $data)) {
+            $payload['service_cost'] = $data['service_cost'];
+        }
+
         if (array_key_exists('status', $data)) {
             $payload['status'] = $data['status'];
         } elseif ($applyDefaultStatus) {

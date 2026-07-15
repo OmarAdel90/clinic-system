@@ -21,6 +21,8 @@ class UpdateVisitRequest extends FormRequest
             'conversation_id'                     => 'nullable|integer|exists:conversations,id',
             'visit_number'                        => 'nullable|string|max:255',
             'visit_date'                          => 'sometimes|required|date',
+            'service_name'                        => 'nullable|string|max:255',
+            'service_cost'                        => 'nullable|numeric|min:0',
             'supplies_reserved'                   => 'nullable|array',
             'supplies_reserved.*.sku'             => 'required_with:supplies_reserved|string|max:100',
             'supplies_reserved.*.name'            => 'required_with:supplies_reserved|string|max:255',

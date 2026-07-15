@@ -13,6 +13,35 @@ use Modules\Warehouse\Models\Warehouse;
 
 class ClinicService
 {
+    protected function normalizeServices(array $services): array
+    {
+        return array_values(array_filter(array_map(function ($service) {
+            if (is_string($service)) {
+                $name = trim($service);
+
+                return $name === '' ? null : [
+                    'name' => $name,
+                    'cost' => 0,
+                ];
+            }
+
+            if (! is_array($service)) {
+                return null;
+            }
+
+            $name = trim((string) ($service['name'] ?? ''));
+
+            if ($name === '') {
+                return null;
+            }
+
+            return [
+                'name' => $name,
+                'cost' => floatval($service['cost'] ?? 0),
+            ];
+        }, $services))));
+    }
+
     public function getAll(User $user): Collection
     {
         try {
@@ -67,6 +96,10 @@ class ClinicService
     {
         try {
             return DB::transaction(function () use ($data) {
+                if (array_key_exists('services', $data) && is_array($data['services'])) {
+                    $data['services'] = $this->normalizeServices($data['services']);
+                }
+
                 return Clinic::create($data);
             });
         } catch (QueryException $e) {
@@ -82,6 +115,10 @@ class ClinicService
     {
         try {
             return DB::transaction(function () use ($clinic, $data, $confirmReassign) {
+                if (array_key_exists('services', $data) && is_array($data['services'])) {
+                    $data['services'] = $this->normalizeServices($data['services']);
+                }
+
                 $providesMedication = array_key_exists('provides_medication', $data)
                     ? (bool) $data['provides_medication']
                     : (bool) $clinic->provides_medication;

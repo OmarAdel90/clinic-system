@@ -99,22 +99,15 @@ class TreatmentPlanService
 
     protected function calculateVisitCosts(TreatmentPlan $plan, array &$visitsData): void
     {
-        $service = Clinic::find($plan->clinic_id);
-        $servicesCost = 0;
-        if ($service && $service->services) {
-            foreach ($service->services as $procedure) {
-                $servicesCost += floatval($procedure['cost'] ?? 0);
-            }
-        }
-
         foreach ($visitsData as &$visitData) {
+            $serviceCost = floatval($visitData['service_cost'] ?? 0);
             $suppliesCost = 0;
             foreach ($visitData['supplies_reserved'] ?? [] as $item) {
                 $suppliesCost += intval($item['quantity']) * floatval($item['unit_price'] ?? 0);
             }
-            $visitData['services_cost'] = $servicesCost;
+            $visitData['services_cost'] = $serviceCost;
             $visitData['supplies_cost'] = $suppliesCost;
-            $visitData['total_cost'] = $servicesCost + $suppliesCost;
+            $visitData['total_cost'] = $serviceCost + $suppliesCost;
         }
     }
 
