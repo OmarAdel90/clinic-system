@@ -11,9 +11,41 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\Builder;
 
 class LeadService
 {
+    public function getPickerOptions(?User $user = null, array $filters = []): Collection
+    {
+        try {
+            $query = Lead::query()
+                ->select(['id', 'name', 'profile_name', 'phone', 'clinic_id', 'lead_status_id'])
+                ->orderByDesc('updated_at');
+
+            $this->applyVisibilityFilter($query, $user);
+
+            $search = trim((string) ($filters['search'] ?? ''));
+            if ($search !== '') {
+                $query->where(function (Builder $builder) use ($search) {
+                    $builder
+                        ->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('profile_name', 'like', '%' . $search . '%')
+                        ->orWhere('phone', 'like', '%' . $search . '%');
+                });
+            }
+
+            $limit = max(1, min((int) ($filters['limit'] ?? 100), 250));
+
+            return $query->limit($limit)->get();
+        } catch (QueryException $e) {
+            Log::error(__METHOD__ . ' failed', ['error' => $e->getMessage(), 'filters' => $filters]);
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::critical(__METHOD__ . ' encountered an unexpected error', ['error' => $e->getMessage(), 'filters' => $filters]);
+            throw $e;
+        }
+    }
+
     public function getAll(?User $user = null): Collection
     {
         try {
@@ -26,10 +58,7 @@ class LeadService
                 'conversations',
             ])->withCount('medicalRecords');
 
-            if ($user && !$user->can('view_any_lead')) {
-                $leadIds = $user->assignedConversations()->pluck('lead_id');
-                $query->whereIn('id', $leadIds);
-            }
+            $this->applyVisibilityFilter($query, $user);
 
             return $query->get();
         } catch (QueryException $e) {
@@ -53,10 +82,7 @@ class LeadService
                 'conversations',
             ])->withCount('medicalRecords');
 
-            if ($user && !$user->can('view_any_lead')) {
-                $leadIds = $user->assignedConversations()->pluck('lead_id');
-                $query->whereIn('id', $leadIds);
-            }
+            $this->applyVisibilityFilter($query, $user);
 
             return $query->findOrFail($id);
         } catch (ModelNotFoundException $e) {
@@ -154,6 +180,14 @@ class LeadService
         } catch (\Throwable $e) {
             Log::critical(__METHOD__ . ' encountered an unexpected error', ['lead_id' => $lead->id, 'clinic_id' => $clinicId, 'error' => $e->getMessage()]);
             throw $e;
+        }
+    }
+
+    protected function applyVisibilityFilter(Builder $query, ?User $user = null): void
+    {
+        if ($user && !$user->can('view_any_lead')) {
+            $leadIds = $user->assignedConversations()->pluck('lead_id');
+            $query->whereIn('id', $leadIds);
         }
     }
 }

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Lead\Controllers\LeadController;
 
 Route::middleware(['auth:sanctum'])->prefix('leads')->group(function () {
+    Route::get('picker', [LeadController::class, 'picker']);
     Route::get('/', [LeadController::class, 'index']);
     Route::post('/', [LeadController::class, 'store']);
     Route::get('{id}', [LeadController::class, 'show']);

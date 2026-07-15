@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Modules\Lead\Models\Lead;
 use Modules\Lead\Requests\AssignLeadClinicRequest;
 use Modules\Lead\Requests\IndexLeadRequest;
+use Modules\Lead\Requests\IndexLeadPickerRequest;
 use Modules\Lead\Requests\ShowLeadRequest;
 use Modules\Lead\Requests\StoreLeadRequest;
 use Modules\Lead\Requests\UpdateLeadRequest;
@@ -20,6 +21,11 @@ class LeadController extends Controller
     public function index(IndexLeadRequest $request): JsonResponse
     {
         return response()->json($this->service->getAll($request->user()));
+    }
+
+    public function picker(IndexLeadPickerRequest $request): JsonResponse
+    {
+        return response()->json($this->service->getPickerOptions($request->user(), $request->validated()));
     }
 
     public function show(ShowLeadRequest $request, int $id): JsonResponse

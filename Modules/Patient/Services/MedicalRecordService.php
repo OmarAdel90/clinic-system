@@ -86,9 +86,8 @@ class MedicalRecordService
         try {
             return DB::transaction(function () use ($record, $data) {
                 if (isset($data['file'])) {
-                    Storage::disk('local')->delete($record->file_path);
-
                     $path = $data['file']->store('medical-records/' . $record->lead_id);
+                    $oldPath = $record->file_path;
 
                     $record->update([
                         'file_path'     => $path,
@@ -97,6 +96,10 @@ class MedicalRecordService
                         'type'          => $data['type'] ?? $record->type,
                         'notes'         => $data['notes'] ?? $record->notes,
                     ]);
+
+                    if ($oldPath && $oldPath !== $path) {
+                        Storage::disk('local')->delete($oldPath);
+                    }
                 } else {
                     $record->update([
                         'type'  => $data['type'] ?? $record->type,

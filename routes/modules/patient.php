@@ -11,6 +11,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 Route::middleware(['auth:sanctum'])->prefix('medical-records')->group(function () {
     Route::get('{medicalRecord}', [MedicalRecordController::class, 'show']);
+    Route::post('{medicalRecord}', [MedicalRecordController::class, 'update']);
     Route::patch('{medicalRecord}', [MedicalRecordController::class, 'update']);
     Route::delete('{medicalRecord}', [MedicalRecordController::class, 'destroy']);
     Route::get('{medicalRecord}/file', [MedicalRecordController::class, 'file']);
