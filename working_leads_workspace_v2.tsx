@@ -362,14 +362,14 @@ export function LeadsWorkspaceV2() {
 
         <Panel title="Create Lead" description="Fast intake form matching the backend lead creation contract.">
             <form className="space-y-4" onSubmit={handleSubmit}>
-              <WorkflowSelect label="Campaign" value={form.campaign_id} onChange={(value) => setForm((current) => ({ ...current, campaign_id: value }))} options={campaigns.map((campaign) => ({ label: campaign.name, value: campaign.id }))} required />
+              <WorkflowSelect label="Campaign" value={form.campaign_id} onChange={(value) => setForm((current) => ({ ...current, campaign_id: value }))} options={campaigns.map((campaign) => ({ label: campaign.name, value: String(campaign.id) }))} required />
               <WorkflowSelect label="Platform" value={form.platform} onChange={(value) => setForm((current) => ({ ...current, platform: value }))} options={[{ label: "WhatsApp", value: "whatsapp" }, { label: "Facebook", value: "facebook" }, { label: "Instagram", value: "instagram" }]} required />
               <WorkflowInput label="Phone" name="phone" value={form.phone} onChange={(value) => setForm((current) => ({ ...current, phone: value }))} placeholder="2010..." required />
               <WorkflowInput label="Name" name="name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} placeholder="Patient name" />
               <WorkflowInput label="Profile Name" name="profile_name" value={form.profile_name} onChange={(value) => setForm((current) => ({ ...current, profile_name: value }))} placeholder="Social profile name" />
               <WorkflowInput label="WhatsApp ID" name="whatsapp_id" value={form.whatsapp_id} onChange={(value) => setForm((current) => ({ ...current, whatsapp_id: value }))} placeholder="Optional platform identifier" />
               {statuses.length > 0 ? (
-                <WorkflowSelect label="Lead Status" value={form.lead_status_id} onChange={(value) => setForm((current) => ({ ...current, lead_status_id: value }))} options={statuses.map((status) => ({ label: status.label, value: status.id }))} emptyLabel="No status" />
+                <WorkflowSelect label="Lead Status" value={form.lead_status_id} onChange={(value) => setForm((current) => ({ ...current, lead_status_id: value }))} options={statuses.map((status) => ({ label: status.label, value: String(status.id) }))} emptyLabel="No status" />
               ) : null}
               <button type="submit" disabled={saving} className="w-full rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500">
                 {saving ? "Creating..." : "Create Lead"}
@@ -466,7 +466,7 @@ export function LeadsWorkspaceV2() {
                             },
                           }))
                         }
-                        options={users.map((user) => ({ label: user.name, value: user.id }))}
+                        options={users.map((user) => ({ label: user.name, value: String(user.id) }))}
                       />
                       <WorkflowSelect
                         label="Assign To Clinic"
@@ -481,7 +481,7 @@ export function LeadsWorkspaceV2() {
                             },
                           }))
                         }
-                        options={clinics.map((clinic) => ({ label: clinic.name, value: clinic.id }))}
+                        options={clinics.map((clinic) => ({ label: clinic.name, value: String(clinic.id) }))}
                       />
                     </div>
 
@@ -499,7 +499,7 @@ export function LeadsWorkspaceV2() {
                             },
                           }))
                         }
-                        options={statuses.map((status) => ({ label: status.label, value: status.id }))}
+                        options={statuses.map((status) => ({ label: status.label, value: String(status.id) }))}
                       />
                       <button
                         type="button"

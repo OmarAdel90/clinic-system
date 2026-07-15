@@ -740,7 +740,7 @@ export function AgentWorkspace() {
                         label="Lead Status"
                         value={leadStatusId}
                         onChange={setLeadStatusId}
-                        options={leadStatuses.map((status) => ({ label: status.label, value: status.id }))}
+                        options={leadStatuses.map((status) => ({ label: status.label, value: String(status.id) }))}
                         emptyLabel="Select status"
                       />
                       <div className="flex gap-3">
@@ -761,7 +761,7 @@ export function AgentWorkspace() {
                         label="Clinic"
                         value={clinicId}
                         onChange={setClinicId}
-                        options={clinics.map((clinic) => ({ label: clinic.name, value: clinic.id }))}
+                        options={clinics.map((clinic) => ({ label: clinic.name, value: String(clinic.id) }))}
                         emptyLabel="No clinic"
                       />
                       <div className="flex gap-3">

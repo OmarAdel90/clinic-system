@@ -37,8 +37,11 @@ class TreatmentPlanController extends Controller
 
     public function update(UpdateTreatmentPlanRequest $request, TreatmentPlan $treatmentPlan): JsonResponse
     {
-        $treatmentPlan->update($request->validated());
-        return response()->json($treatmentPlan->fresh());
+        try {
+            return response()->json($this->service->update($treatmentPlan, $request->validated()));
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function destroy(DestroyTreatmentPlanRequest $request, TreatmentPlan $treatmentPlan): JsonResponse

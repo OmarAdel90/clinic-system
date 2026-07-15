@@ -44,6 +44,14 @@ type VisitForm = {
   supplies_reserved: SupplyForm[];
 };
 
+type PlanEditForm = {
+  lead_id: string;
+  user_id: string;
+  clinic_id: string;
+  diagnosis: string;
+  notes: string;
+};
+
 type CompleteForm = {
   diagnosis: string;
   treatment_notes: string;
@@ -88,6 +96,14 @@ const initialVisitForm: VisitForm = {
   supplies_reserved: [],
 };
 
+const initialPlanEditForm: PlanEditForm = {
+  lead_id: "",
+  user_id: "",
+  clinic_id: "",
+  diagnosis: "",
+  notes: "",
+};
+
 const initialCompleteForm: CompleteForm = {
   diagnosis: "",
   treatment_notes: "",
@@ -114,6 +130,22 @@ function toVisitFormForPlan(plan?: TreatmentPlanRef | null): VisitForm {
     service_name: "",
     service_cost: "0",
     supplies_reserved: [],
+  };
+}
+
+function toVisitEditForm(visit?: Visit | null): VisitForm {
+  return {
+    scheduled_date: visit?.scheduled_date ? String(visit.scheduled_date).slice(0, 16) : "",
+    status: visit?.status || "scheduled",
+    visit_number: visit?.visit_number ? String(visit.visit_number) : "",
+    service_name: String((visit as Visit & { service_name?: string | null }).service_name ?? ""),
+    service_cost: String((visit as Visit & { service_cost?: number | null }).service_cost ?? visit?.services_cost ?? 0),
+    supplies_reserved: (visit?.supplies_reserved ?? []).map((row) => ({
+      sku: row.sku || "",
+      name: row.name || "",
+      quantity: String(row.quantity ?? 1),
+      unit_price: String(row.unit_price ?? 0),
+    })),
   };
 }
 
@@ -275,18 +307,26 @@ export function TreatmentPlansWorkspace() {
   const [pharmaceuticals, setPharmaceuticals] = useState<Pharmaceutical[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [form, setForm] = useState<TreatmentPlanForm>(initialForm);
+  const [planEditForm, setPlanEditForm] = useState<PlanEditForm>(initialPlanEditForm);
   const [visitForm, setVisitForm] = useState<VisitForm>(initialVisitForm);
+  const [editVisitForms, setEditVisitForms] = useState<Record<number, VisitForm>>({});
   const [completeForms, setCompleteForms] = useState<Record<number, CompleteForm>>({});
   const [search, setSearch] = useState("");
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
   const [savingVisit, setSavingVisit] = useState(false);
+  const [savingExistingVisitId, setSavingExistingVisitId] = useState<number | null>(null);
   const [activeVisit, setActiveVisit] = useState<number | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [createPlanError, setCreatePlanError] = useState<string | null>(null);
+  const [planEditError, setPlanEditError] = useState<string | null>(null);
+  const [addVisitError, setAddVisitError] = useState<string | null>(null);
+  const [visitEditErrors, setVisitEditErrors] = useState<Record<number, string | null>>({});
 
   const filteredPlans = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -327,7 +367,7 @@ export function TreatmentPlansWorkspace() {
   const pharmaceuticalOptions = useMemo(
     () =>
       pharmaceuticals.map((item) => ({
-        label: `${item.SKU} | ${item.name}`,
+        label: `${item.name} (${item.SKU})`,
         value: item.SKU,
       })),
     [pharmaceuticals],
@@ -341,7 +381,7 @@ export function TreatmentPlansWorkspace() {
   const leadOptions = useMemo(
     () =>
       leads.map((lead) => ({
-        label: `${lead.name || lead.profile_name || `Lead #${lead.id}`} ${lead.phone ? `| ${lead.phone}` : ""}`.trim(),
+        label: `${lead.name || lead.profile_name || `Lead #${lead.id}`}${lead.phone ? ` (${lead.phone})` : ""}`,
         value: String(lead.id),
       })),
     [leads],
@@ -359,7 +399,7 @@ export function TreatmentPlansWorkspace() {
   const clinicOptions = useMemo(
     () =>
       clinics.map((clinic) => ({
-        label: `${clinic.name}${clinic.address ? ` | ${clinic.address}` : ""}`,
+        label: `${clinic.name}${clinic.address ? ` - ${clinic.address}` : ""}`,
         value: String(clinic.id),
       })),
     [clinics],
@@ -391,7 +431,7 @@ export function TreatmentPlansWorkspace() {
         }
 
         return {
-          label: `${row.sku} | ${pharmaceutical?.name || row.name || row.sku} | ${available} available`,
+          label: `${pharmaceutical?.name || row.name || row.sku} (${row.sku}) - ${available} available`,
           value: row.sku,
         };
       })
@@ -406,7 +446,7 @@ export function TreatmentPlansWorkspace() {
   const selectedClinicServiceOptions = useMemo(
     () =>
       selectedClinicServices.map((service) => ({
-        label: `${service.name}${service.cost ? ` | ${service.cost}` : ""}`,
+        label: service.name,
         value: service.name,
       })),
     [selectedClinicServices],
@@ -443,7 +483,7 @@ export function TreatmentPlansWorkspace() {
         }
 
         return {
-          label: `${row.sku} | ${pharmaceutical?.name || row.name || row.sku} | ${available} available`,
+          label: `${pharmaceutical?.name || row.name || row.sku} (${row.sku}) - ${available} available`,
           value: row.sku,
         };
       })
@@ -453,7 +493,7 @@ export function TreatmentPlansWorkspace() {
   const popupClinicServiceOptions = useMemo(
     () =>
       popupClinicServices.map((service) => ({
-        label: `${service.name}${service.cost ? ` | ${service.cost}` : ""}`,
+        label: service.name,
         value: service.name,
       })),
     [popupClinicServices],
@@ -501,6 +541,16 @@ export function TreatmentPlansWorkspace() {
   useEffect(() => {
     if (selectedPlan) {
       setVisitForm(toVisitFormForPlan(selectedPlan));
+      setPlanEditForm({
+        lead_id: selectedPlan.lead_id ? String(selectedPlan.lead_id) : "",
+        user_id: selectedPlan.user_id ? String(selectedPlan.user_id) : "",
+        clinic_id: selectedPlan.clinic_id ? String(selectedPlan.clinic_id) : "",
+        diagnosis: selectedPlan.diagnosis || "",
+        notes: selectedPlan.notes || "",
+      });
+      setEditVisitForms(
+        Object.fromEntries((selectedPlan.visits ?? []).map((visit) => [visit.id, toVisitEditForm(visit)])),
+      );
     }
   }, [selectedPlan?.id]);
 
@@ -509,6 +559,7 @@ export function TreatmentPlansWorkspace() {
     setSaving(true);
     setError(null);
     setNotice(null);
+    setCreatePlanError(null);
 
     try {
       await mutateJson("/treatment-plans", "POST", {
@@ -528,7 +579,8 @@ export function TreatmentPlansWorkspace() {
       setNotice("Treatment plan created successfully.");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create treatment plan.");
+      const message = err instanceof Error ? err.message : "Unable to create treatment plan.";
+      setCreatePlanError(message);
     } finally {
       setSaving(false);
     }
@@ -543,6 +595,7 @@ export function TreatmentPlansWorkspace() {
     setSavingVisit(true);
     setError(null);
     setNotice(null);
+    setAddVisitError(null);
 
     try {
       await mutateJson("/visits", "POST", {
@@ -562,9 +615,40 @@ export function TreatmentPlansWorkspace() {
       await load();
       setDetailsOpen(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create visit for plan.");
+      const message = err instanceof Error ? err.message : "Unable to create visit for plan.";
+      setAddVisitError(message);
     } finally {
       setSavingVisit(false);
+    }
+  }
+
+  async function updateSelectedPlan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedPlan) {
+      return;
+    }
+
+    setSavingPlan(true);
+    setError(null);
+    setNotice(null);
+    setPlanEditError(null);
+
+    try {
+      await mutateJson(`/treatment-plans/${selectedPlan.id}`, "PATCH", {
+        lead_id: Number(planEditForm.lead_id),
+        user_id: Number(planEditForm.user_id),
+        clinic_id: Number(planEditForm.clinic_id),
+        diagnosis: planEditForm.diagnosis || null,
+        notes: planEditForm.notes || null,
+      });
+      setNotice(`Treatment plan #${selectedPlan.id} updated successfully.`);
+      await load();
+      setDetailsOpen(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to update treatment plan.";
+      setPlanEditError(message);
+    } finally {
+      setSavingPlan(false);
     }
   }
 
@@ -710,6 +794,100 @@ export function TreatmentPlansWorkspace() {
     }));
   }
 
+  function updateExistingVisitForm(visitId: number, patch: Partial<VisitForm>) {
+    setEditVisitForms((state) => ({
+      ...state,
+      [visitId]: {
+        ...(state[visitId] ?? initialVisitForm),
+        ...patch,
+      },
+    }));
+  }
+
+  function updateExistingVisitSupplyRow(visitId: number, index: number, field: keyof SupplyForm, value: string) {
+    const current = editVisitForms[visitId] ?? initialVisitForm;
+    updateExistingVisitForm(visitId, {
+      supplies_reserved: current.supplies_reserved.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [field]: value } : row,
+      ),
+    });
+  }
+
+  function selectExistingVisitSupplySku(visitId: number, index: number, sku: string) {
+    const pharmaceutical = pharmaceuticalLookup.get(sku);
+    const current = editVisitForms[visitId] ?? initialVisitForm;
+    updateExistingVisitForm(visitId, {
+      supplies_reserved: current.supplies_reserved.map((row, rowIndex) =>
+        rowIndex === index
+          ? {
+              ...row,
+              sku,
+              name: pharmaceutical?.name || row.name,
+              unit_price: pharmaceutical?.sale_price != null ? String(pharmaceutical.sale_price) : row.unit_price,
+            }
+          : row,
+      ),
+    });
+  }
+
+  function addExistingVisitSupplyRow(visitId: number) {
+    const current = editVisitForms[visitId] ?? initialVisitForm;
+    updateExistingVisitForm(visitId, {
+      supplies_reserved: [...current.supplies_reserved, initialSupplyForm],
+    });
+  }
+
+  function removeExistingVisitSupplyRow(visitId: number, index: number) {
+    const current = editVisitForms[visitId] ?? initialVisitForm;
+    updateExistingVisitForm(visitId, {
+      supplies_reserved: current.supplies_reserved.filter((_, rowIndex) => rowIndex !== index),
+    });
+  }
+
+  function selectExistingVisitService(visitId: number, serviceName: string) {
+    const service = popupClinicServiceLookup.get(serviceName);
+    updateExistingVisitForm(visitId, {
+      service_name: serviceName,
+      service_cost: String(service?.cost ?? 0),
+    });
+  }
+
+  async function saveExistingVisit(visitId: number) {
+    const current = editVisitForms[visitId];
+    if (!current) {
+      return;
+    }
+
+    setSavingExistingVisitId(visitId);
+    setError(null);
+    setNotice(null);
+    setVisitEditErrors((state) => ({
+      ...state,
+      [visitId]: null,
+    }));
+
+    try {
+      await mutateJson(`/visits/${visitId}`, "PATCH", {
+        visit_number: current.visit_number || null,
+        visit_date: current.scheduled_date,
+        service_name: current.service_name || null,
+        service_cost: Number(current.service_cost || 0),
+        supplies_reserved: toSupplyLines(current.supplies_reserved),
+      });
+      setNotice("Visit updated successfully.");
+      await load();
+      setDetailsOpen(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to update visit.";
+      setVisitEditErrors((state) => ({
+        ...state,
+        [visitId]: message,
+      }));
+    } finally {
+      setSavingExistingVisitId(null);
+    }
+  }
+
   async function runVisitAction(id: number, action: "confirm" | "cancel" | "miss") {
     setActiveVisit(id);
     setError(null);
@@ -843,6 +1021,11 @@ export function TreatmentPlansWorkspace() {
       <div className="space-y-6">
         <Panel title="Create Treatment Plan" description="Create a plan and define the visit schedule that should be generated immediately.">
           <form className="space-y-4" onSubmit={handleCreate}>
+            {createPlanError ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {createPlanError}
+              </div>
+            ) : null}
             <SearchableSelect
               label="Lead"
               value={form.lead_id}
@@ -1057,6 +1240,7 @@ export function TreatmentPlansWorkspace() {
                     <div className="space-y-4">
                       {(selectedPlan.visits ?? []).map((visit, visitIndex) => {
                         const completeForm = completeForms[visit.id] ?? initialCompleteForm;
+                        const editVisitForm = editVisitForms[visit.id] ?? toVisitEditForm(visit);
                         const isScheduled = visit.status === "scheduled";
                         const isConfirmed = visit.status === "confirmed";
 
@@ -1098,6 +1282,110 @@ export function TreatmentPlansWorkspace() {
                                 ))}
                               </div>
                             ) : null}
+
+                            <div className="mt-4 space-y-4 rounded-xl border border-[var(--line)] bg-white p-4">
+                              <div className="text-sm font-semibold text-slate-950">Edit Visit</div>
+                              {visitEditErrors[visit.id] ? (
+                                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                  {visitEditErrors[visit.id]}
+                                </div>
+                              ) : null}
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <WorkflowInput
+                                  label="Scheduled Date"
+                                  name={`edit-scheduled-${visit.id}`}
+                                  type="datetime-local"
+                                  value={editVisitForm.scheduled_date}
+                                  onChange={(value) => updateExistingVisitForm(visit.id, { scheduled_date: value })}
+                                />
+                                <WorkflowInput
+                                  label="Visit Reference"
+                                  name={`edit-visit-number-${visit.id}`}
+                                  value={editVisitForm.visit_number}
+                                  onChange={(value) => updateExistingVisitForm(visit.id, { visit_number: value })}
+                                />
+                              </div>
+                              <div className="grid gap-3 md:grid-cols-[1.4fr_180px]">
+                                <SearchableSelect
+                                  label="Clinic Service"
+                                  value={editVisitForm.service_name}
+                                  onChange={(value) => selectExistingVisitService(visit.id, value)}
+                                  options={popupClinicServiceOptions}
+                                  placeholder="Search clinic service"
+                                />
+                                <WorkflowInput
+                                  label="Service Cost"
+                                  name={`edit-service-cost-${visit.id}`}
+                                  type="number"
+                                  value={editVisitForm.service_cost}
+                                  onChange={(value) => updateExistingVisitForm(visit.id, { service_cost: value })}
+                                />
+                              </div>
+
+                              {popupClinicSupportsMedication ? (
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="text-sm font-medium text-slate-900">Reserved Supplies</div>
+                                    <button type="button" onClick={() => addExistingVisitSupplyRow(visit.id)} className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-medium text-slate-700">
+                                      Add Supply
+                                    </button>
+                                  </div>
+                                  {editVisitForm.supplies_reserved.map((row, index) => (
+                                    <div key={`${visit.id}-edit-supply-${index}`} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                                      <div className="grid gap-3 lg:grid-cols-2">
+                                        <SearchableSelect
+                                          label="SKU"
+                                          value={row.sku}
+                                          onChange={(value) => selectExistingVisitSupplySku(visit.id, index, value)}
+                                          options={popupClinicWarehouseOptions}
+                                          placeholder="Search clinic warehouse inventory"
+                                        />
+                                        <WorkflowInput
+                                          label="Name"
+                                          name={`edit-name-${visit.id}-${index}`}
+                                          value={row.name}
+                                          onChange={(value) => updateExistingVisitSupplyRow(visit.id, index, "name", value)}
+                                        />
+                                      </div>
+                                      <div className="mt-3 grid gap-3 sm:grid-cols-[140px_160px_auto]">
+                                        <WorkflowInput
+                                          label="Qty"
+                                          name={`edit-qty-${visit.id}-${index}`}
+                                          type="number"
+                                          value={row.quantity}
+                                          onChange={(value) => updateExistingVisitSupplyRow(visit.id, index, "quantity", value)}
+                                        />
+                                        <WorkflowInput
+                                          label="Unit Price"
+                                          name={`edit-price-${visit.id}-${index}`}
+                                          type="number"
+                                          value={row.unit_price}
+                                          onChange={(value) => updateExistingVisitSupplyRow(visit.id, index, "unit_price", value)}
+                                        />
+                                        <div className="flex items-end">
+                                          <button type="button" onClick={() => removeExistingVisitSupplyRow(visit.id, index)} className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-medium text-slate-700 sm:w-auto">
+                                            Remove
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                                  This clinic is services-only, so this visit does not reserve medication supplies.
+                                </div>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => void saveExistingVisit(visit.id)}
+                                disabled={savingExistingVisitId === visit.id}
+                                className="rounded-lg border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500"
+                              >
+                                {savingExistingVisitId === visit.id ? "Saving..." : "Save Visit Changes"}
+                              </button>
+                            </div>
 
                             <div className="mt-4 flex flex-wrap gap-2">
                               <button
@@ -1192,8 +1480,57 @@ export function TreatmentPlansWorkspace() {
                 </div>
 
                 <div className="space-y-5">
+                  <Panel title="Edit Plan" description="Reassign the plan owner, lead, clinic, and notes without leaving the case workspace.">
+                    <form className="space-y-4" onSubmit={updateSelectedPlan}>
+                      {planEditError ? (
+                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                          {planEditError}
+                        </div>
+                      ) : null}
+                      <SearchableSelect
+                        label="Lead"
+                        value={planEditForm.lead_id}
+                        onChange={(value) => setPlanEditForm((current) => ({ ...current, lead_id: value }))}
+                        options={leadOptions}
+                        placeholder="Search lead by name or phone"
+                      />
+                      <SearchableSelect
+                        label="Assigned User"
+                        value={planEditForm.user_id}
+                        onChange={(value) => setPlanEditForm((current) => ({ ...current, user_id: value }))}
+                        options={userOptions}
+                        placeholder="Search user"
+                      />
+                      <SearchableSelect
+                        label="Clinic"
+                        value={planEditForm.clinic_id}
+                        onChange={(value) => setPlanEditForm((current) => ({ ...current, clinic_id: value }))}
+                        options={clinicOptions}
+                        placeholder="Search clinic"
+                      />
+                      <WorkflowTextarea
+                        label="Diagnosis"
+                        value={planEditForm.diagnosis}
+                        onChange={(value) => setPlanEditForm((current) => ({ ...current, diagnosis: value }))}
+                      />
+                      <WorkflowTextarea
+                        label="Notes"
+                        value={planEditForm.notes}
+                        onChange={(value) => setPlanEditForm((current) => ({ ...current, notes: value }))}
+                      />
+                      <button type="submit" disabled={savingPlan} className="w-full rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500">
+                        {savingPlan ? "Saving..." : "Save Plan Changes"}
+                      </button>
+                    </form>
+                  </Panel>
+
                   <Panel title="Add Visit To Plan" description="Schedule a new visit directly inside the selected treatment plan.">
                     <form className="space-y-4" onSubmit={createVisitForPlan}>
+                      {addVisitError ? (
+                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                          {addVisitError}
+                        </div>
+                      ) : null}
                       <WorkflowInput
                         label="Scheduled Date"
                         name="plan-popup-visit-date"

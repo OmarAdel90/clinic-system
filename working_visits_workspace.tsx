@@ -404,13 +404,13 @@ export function VisitsWorkspace() {
               label="Clinic"
               value={clinicFilter}
               onChange={setClinicFilter}
-              options={[{ label: "All clinics", value: "all" }, ...clinics.map((clinic) => ({ label: clinic.name, value: clinic.id }))]}
+              options={[{ label: "All clinics", value: "all" }, ...clinics.map((clinic) => ({ label: clinic.name, value: String(clinic.id) }))]}
             />
             <WorkflowSelect
               label="Assigned User"
               value={userFilter}
               onChange={setUserFilter}
-              options={[{ label: "All users", value: "all" }, ...users.map((user) => ({ label: user.name, value: user.id }))]}
+              options={[{ label: "All users", value: "all" }, ...users.map((user) => ({ label: user.name, value: String(user.id) }))]}
             />
           </div>
 
@@ -461,21 +461,21 @@ export function VisitsWorkspace() {
               label="Lead"
               value={form.lead_id}
               onChange={(value) => setForm((current) => ({ ...current, lead_id: value }))}
-              options={leads.map((lead) => ({ label: lead.name || lead.profile_name || `Lead #${lead.id}`, value: lead.id }))}
+              options={leads.map((lead) => ({ label: lead.name || lead.profile_name || `Lead #${lead.id}`, value: String(lead.id) }))}
               required
             />
             <WorkflowSelect
               label="Assigned User"
               value={form.user_id}
               onChange={(value) => setForm((current) => ({ ...current, user_id: value }))}
-              options={users.map((user) => ({ label: user.name, value: user.id }))}
+              options={users.map((user) => ({ label: user.name, value: String(user.id) }))}
               required
             />
             <WorkflowSelect
               label="Clinic"
               value={form.clinic_id}
               onChange={(value) => setForm((current) => ({ ...current, clinic_id: value }))}
-              options={clinics.map((clinic) => ({ label: clinic.name, value: clinic.id }))}
+              options={clinics.map((clinic) => ({ label: clinic.name, value: String(clinic.id) }))}
               required
             />
             <div className="grid gap-4 md:grid-cols-2">
@@ -594,11 +594,11 @@ export function VisitsWorkspace() {
                   <Panel title="Edit Visit" description="Update the selected visit without leaving the operations board.">
                     <form className="space-y-4" onSubmit={handleUpdate}>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <WorkflowSelect label="Lead" value={editForm.lead_id} onChange={(value) => setEditForm((current) => ({ ...current, lead_id: value }))} options={leads.map((lead) => ({ label: lead.name || lead.profile_name || `Lead #${lead.id}`, value: lead.id }))} required />
-                        <WorkflowSelect label="Assigned User" value={editForm.user_id} onChange={(value) => setEditForm((current) => ({ ...current, user_id: value }))} options={users.map((user) => ({ label: user.name, value: user.id }))} required />
+                        <WorkflowSelect label="Lead" value={editForm.lead_id} onChange={(value) => setEditForm((current) => ({ ...current, lead_id: value }))} options={leads.map((lead) => ({ label: lead.name || lead.profile_name || `Lead #${lead.id}`, value: String(lead.id) }))} required />
+                        <WorkflowSelect label="Assigned User" value={editForm.user_id} onChange={(value) => setEditForm((current) => ({ ...current, user_id: value }))} options={users.map((user) => ({ label: user.name, value: String(user.id) }))} required />
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <WorkflowSelect label="Clinic" value={editForm.clinic_id} onChange={(value) => setEditForm((current) => ({ ...current, clinic_id: value }))} options={clinics.map((clinic) => ({ label: clinic.name, value: clinic.id }))} required />
+                        <WorkflowSelect label="Clinic" value={editForm.clinic_id} onChange={(value) => setEditForm((current) => ({ ...current, clinic_id: value }))} options={clinics.map((clinic) => ({ label: clinic.name, value: String(clinic.id) }))} required />
                         <WorkflowSelect
                           label="Status"
                           value={editForm.status}

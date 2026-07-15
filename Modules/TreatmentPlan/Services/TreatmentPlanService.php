@@ -97,6 +97,89 @@ class TreatmentPlanService
         }
     }
 
+    public function update(TreatmentPlan $plan, array $data): TreatmentPlan
+    {
+        try {
+            return DB::transaction(function () use ($plan, $data) {
+                $payload = [];
+
+                foreach (['lead_id', 'user_id', 'clinic_id', 'diagnosis', 'notes', 'type', 'status'] as $field) {
+                    if (array_key_exists($field, $data)) {
+                        $payload[$field] = $data[$field];
+                    }
+                }
+
+                $originalClinicId = $plan->clinic_id;
+                $nextClinicId = $payload['clinic_id'] ?? $originalClinicId;
+                $clinicChanged = array_key_exists('clinic_id', $payload) && (int) $nextClinicId !== (int) $originalClinicId;
+
+                if ($clinicChanged) {
+                    $activeVisits = $plan->visits()
+                        ->whereIn('status', ['scheduled', 'confirmed'])
+                        ->get();
+
+                    $oldWarehouseId = $originalClinicId
+                        ? $this->warehouseService->getWarehouseIdForClinic((int) $originalClinicId)
+                        : null;
+                    $newWarehouseId = $nextClinicId
+                        ? $this->warehouseService->getWarehouseIdForClinic((int) $nextClinicId)
+                        : null;
+
+                    foreach ($activeVisits as $visit) {
+                        $supplies = $visit->supplies_reserved ?? [];
+
+                        if (empty($supplies)) {
+                            continue;
+                        }
+
+                        if (! $newWarehouseId) {
+                            throw new \RuntimeException('The selected clinic does not have a warehouse for the reserved supplies on this plan.');
+                        }
+
+                        $this->warehouseService->checkSufficientStock($newWarehouseId, $supplies);
+                    }
+
+                    foreach ($activeVisits as $visit) {
+                        $supplies = $visit->supplies_reserved ?? [];
+
+                        if (! empty($supplies) && $oldWarehouseId) {
+                            $this->warehouseService->releaseReserved($oldWarehouseId, $supplies);
+                        }
+                    }
+
+                    foreach ($activeVisits as $visit) {
+                        $supplies = $visit->supplies_reserved ?? [];
+
+                        if (! empty($supplies)) {
+                            $this->reserveSupplies((int) $nextClinicId, $supplies);
+                        }
+                    }
+                }
+
+                $plan->update($payload);
+
+                $visitPayload = [];
+                foreach (['lead_id', 'user_id', 'clinic_id'] as $field) {
+                    if (array_key_exists($field, $payload)) {
+                        $visitPayload[$field] = $payload[$field];
+                    }
+                }
+
+                if (! empty($visitPayload)) {
+                    $plan->visits()->update($visitPayload);
+                }
+
+                return $plan->fresh(['lead', 'user', 'clinic', 'visits']);
+            });
+        } catch (QueryException $e) {
+            Log::error(__METHOD__ . ' failed', ['model_id' => $plan->id, 'error' => $e->getMessage(), 'data' => $data]);
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::critical(__METHOD__ . ' encountered an unexpected error', ['error' => $e->getMessage(), 'model_id' => $plan->id]);
+            throw $e;
+        }
+    }
+
     protected function calculateVisitCosts(TreatmentPlan $plan, array &$visitsData): void
     {
         foreach ($visitsData as &$visitData) {
