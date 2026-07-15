@@ -39,7 +39,7 @@ class ClinicService
                 'name' => $name,
                 'cost' => floatval($service['cost'] ?? 0),
             ];
-        }, $services))));
+        }, $services)));
     }
 
     public function getAll(User $user): Collection
