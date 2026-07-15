@@ -3,6 +3,7 @@
 namespace Modules\Supplier\Services;
 
 use Modules\Supplier\Models\SupplierPaymentHistory;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
@@ -13,7 +14,7 @@ class SupplierPaymentService
     public function getAll(): Collection
     {
         try {
-            return SupplierPaymentHistory::with('transaction', 'supplier')->get();
+            return SupplierPaymentHistory::with('transaction', 'supplier', 'paymentEvents.recordedByUser')->get();
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['error' => $e->getMessage()]);
             throw $e;
@@ -26,7 +27,7 @@ class SupplierPaymentService
     public function get(int $id): SupplierPaymentHistory
     {
         try {
-            return SupplierPaymentHistory::with('transaction', 'supplier')->findOrFail($id);
+            return SupplierPaymentHistory::with('transaction', 'supplier', 'paymentEvents.recordedByUser')->findOrFail($id);
         } catch (ModelNotFoundException $e) {
             Log::warning(__METHOD__ . ' model not found', ['id' => $id]);
             throw $e;
@@ -52,20 +53,29 @@ class SupplierPaymentService
         }
     }
 
-    public function recordPayment(SupplierPaymentHistory $payment, float $amount): SupplierPaymentHistory
+    public function recordPayment(SupplierPaymentHistory $payment, float $amount, ?int $recordedBy = null, ?string $notes = null): SupplierPaymentHistory
     {
         try {
-            $newTotalPaid = $payment->total_paid + $amount;
+            $newTotalPaid = (float) $payment->total_paid + $amount;
 
             if ($newTotalPaid > $payment->total_amount) {
                 throw new \Exception('Payment amount exceeds the total amount due.');
             }
 
-            $payment->total_paid   = $newTotalPaid;
-            $payment->payment_status = ($newTotalPaid >= $payment->total_amount) ? 'paid' : 'partial';
-            $payment->save();
+            DB::transaction(function () use ($payment, $amount, $newTotalPaid, $recordedBy, $notes) {
+                $payment->paymentEvents()->create([
+                    'amount' => $amount,
+                    'paid_at' => now(),
+                    'recorded_by' => $recordedBy,
+                    'notes' => $notes,
+                ]);
 
-            return $payment->fresh();
+                $payment->total_paid = $newTotalPaid;
+                $payment->payment_status = ($newTotalPaid >= $payment->total_amount) ? 'paid' : 'partial';
+                $payment->save();
+            });
+
+            return $payment->fresh(['transaction', 'supplier', 'paymentEvents.recordedByUser']);
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['model_id' => $payment->id, 'error' => $e->getMessage()]);
             throw $e;

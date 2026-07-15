@@ -35,7 +35,12 @@ class SupplierPaymentController extends Controller
     public function pay(PayRequest $request, SupplierPaymentHistory $supplierPayment): JsonResponse
     {
         try {
-            $payment = $this->service->recordPayment($supplierPayment, $request->validated()['amount']);
+            $payment = $this->service->recordPayment(
+                $supplierPayment,
+                (float) $request->validated()['amount'],
+                $request->user()?->id,
+                $request->validated()['notes'] ?? null,
+            );
             return response()->json($payment);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);

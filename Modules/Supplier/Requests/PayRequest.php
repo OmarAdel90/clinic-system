@@ -15,6 +15,7 @@ class PayRequest extends FormRequest
     {
         return [
             'amount' => 'required|numeric|min:0.01',
+            'notes' => 'nullable|string|max:1000',
         ];
     }
 }

@@ -10,7 +10,8 @@ class SupplierPaymentHistory extends Model
 {
     use HasFactory;
 
-        public $table = 'supplier_payment_history';
+    public $table = 'supplier_payment_history';
+
     protected $fillable = [
         'transaction_id',
         'supplier_id',
@@ -32,5 +33,10 @@ class SupplierPaymentHistory extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function paymentEvents()
+    {
+        return $this->hasMany(SupplierPaymentEvent::class, 'supplier_payment_history_id')->orderByDesc('paid_at')->orderByDesc('id');
     }
 }
