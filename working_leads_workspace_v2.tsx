@@ -32,6 +32,11 @@ const initialForm: LeadForm = {
 type LeadDetailsView = "overview" | "conversations" | "actions";
 const NEXT_QUEUE_OPTION = "__next_queue__";
 
+function getLeadDisplayName(lead?: Lead | (Lead & { arabic_name?: string | null }) | null) {
+  if (!lead) return "Unknown lead";
+  return lead.name || (lead as Lead & { arabic_name?: string | null }).arabic_name || lead.profile_name || `Lead #${lead.id}`;
+}
+
 function getLeadStatusDisplay(lead: Lead) {
   return lead.lead_status?.label || lead.lead_status?.key || String(lead.lead_status_id ?? "new");
 }
@@ -388,7 +393,7 @@ export function LeadsWorkspaceV2() {
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <div className="text-sm font-semibold">{lead.name || lead.profile_name || `Lead #${lead.id}`}</div>
+                        <div className="text-sm font-semibold">{getLeadDisplayName(lead)}</div>
                       <div className={`mt-1 text-sm ${active ? "text-slate-200" : "text-slate-600"}`}>
                         {lead.phone || "No phone"} | {lead.platform || "Unknown channel"}
                       </div>
@@ -490,7 +495,7 @@ export function LeadsWorkspaceV2() {
           <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.2)]">
             <div className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-5 py-4">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-lg font-semibold text-slate-950">{selectedLead.name || selectedLead.profile_name || `Lead #${selectedLead.id}`}</div>
+                <div className="truncate text-lg font-semibold text-slate-950">{getLeadDisplayName(selectedLead)}</div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
                   <span>{selectedLead.phone || "No phone"}</span>
                   <span>{selectedLead.platform || "Unknown channel"}</span>
@@ -536,7 +541,7 @@ export function LeadsWorkspaceV2() {
                   <Panel title="Profile" description="Current lead state, handoff timing, and record access.">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-slate-950">{selectedLead.name || selectedLead.profile_name || `Lead #${selectedLead.id}`}</div>
+                        <div className="truncate text-sm font-semibold text-slate-950">{getLeadDisplayName(selectedLead)}</div>
                         <div className="mt-1 text-sm text-slate-600">{selectedLead.phone || "No phone"} {selectedLead.platform ? `• ${selectedLead.platform}` : ""}</div>
                       </div>
                       <StatusBadge value={getLeadStatusDisplay(selectedLead)} color={getLeadStatusColor(selectedLead)} />

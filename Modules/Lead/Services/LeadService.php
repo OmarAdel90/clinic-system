@@ -19,7 +19,7 @@ class LeadService
     {
         try {
             $query = Lead::query()
-                ->select(['id', 'name', 'profile_name', 'phone', 'clinic_id', 'lead_status_id'])
+                ->select(['id', 'name', 'arabic_name', 'profile_name', 'phone', 'clinic_id', 'lead_status_id'])
                 ->orderByDesc('updated_at');
 
             $this->applyVisibilityFilter($query, $user);
@@ -29,6 +29,7 @@ class LeadService
                 $query->where(function (Builder $builder) use ($search) {
                     $builder
                         ->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('arabic_name', 'like', '%' . $search . '%')
                         ->orWhere('profile_name', 'like', '%' . $search . '%')
                         ->orWhere('phone', 'like', '%' . $search . '%');
                 });

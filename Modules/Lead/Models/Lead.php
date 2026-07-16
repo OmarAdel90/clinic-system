@@ -15,7 +15,7 @@ class Lead extends Model
 {
     use HasFactory;
 
-        protected $fillable = [
+    protected $fillable = [
         'campaign_id',
         'clinic_id',
         'clinic_assigned_by',
@@ -24,6 +24,7 @@ class Lead extends Model
         'whatsapp_id',
         'phone',
         'name',
+        'arabic_name',
         'profile_name',
         'metadata',
         'lead_status_id',
@@ -67,5 +68,45 @@ class Lead extends Model
     public function medicalRecords()
     {
         return $this->hasMany(MedicalRecord::class);
+    }
+
+    public function setNameAttribute($value): void
+    {
+        $normalized = $this->normalizeLocalizedName($value);
+
+        $this->attributes['name'] = $normalized['name'];
+        $this->attributes['arabic_name'] = $normalized['arabic_name'];
+    }
+
+    public function setArabicNameAttribute($value): void
+    {
+        $normalized = $this->normalizeLocalizedName($value);
+
+        $this->attributes['name'] = $normalized['name'];
+        $this->attributes['arabic_name'] = $normalized['arabic_name'];
+    }
+
+    protected function normalizeLocalizedName($value): array
+    {
+        $trimmed = is_string($value) ? trim($value) : null;
+
+        if ($trimmed === null || $trimmed === '') {
+            return [
+                'name' => null,
+                'arabic_name' => null,
+            ];
+        }
+
+        if (preg_match('/\p{Arabic}/u', $trimmed) === 1) {
+            return [
+                'name' => null,
+                'arabic_name' => $trimmed,
+            ];
+        }
+
+        return [
+            'name' => $trimmed,
+            'arabic_name' => null,
+        ];
     }
 }

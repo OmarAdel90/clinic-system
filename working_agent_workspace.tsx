@@ -21,7 +21,8 @@ import { WorkflowInput } from "@/components/workflow-input";
 import { WorkflowSelect } from "@/components/workflow-select";
 
 function getConversationTitle(conversation: Conversation) {
-  return conversation.lead?.name || conversation.lead?.profile_name || `Lead #${conversation.lead_id ?? conversation.id}`;
+  const arabicName = (conversation.lead as (Conversation["lead"] & { arabic_name?: string | null }) | null | undefined)?.arabic_name;
+  return conversation.lead?.name || arabicName || conversation.lead?.profile_name || `Lead #${conversation.lead_id ?? conversation.id}`;
 }
 
 function getPlatformLabel(platform?: string | null) {
