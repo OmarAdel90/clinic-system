@@ -86,10 +86,11 @@ class CampaignService
 
     public function getAvailableMetaCampaigns(): array
     {
+        $adsToken = (string) config('services.meta_facebook.ads_access_token', '');
         $adAccountId = (string) config('services.meta_facebook.ad_account_id', '');
 
-        if (blank($adAccountId)) {
-            throw new \RuntimeException('No Meta ad account is selected in settings.');
+        if (blank($adsToken) || blank($adAccountId)) {
+            return [];
         }
 
         $existingIds = Campaign::query()->pluck('id')->map(fn ($id) => (string) $id)->all();
