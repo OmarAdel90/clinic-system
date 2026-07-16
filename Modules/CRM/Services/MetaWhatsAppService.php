@@ -245,7 +245,7 @@ class MetaWhatsAppService
             $safeName = $filename ? pathinfo($filename, PATHINFO_FILENAME) : $mediaId;
             $safeName = str($safeName)->slug('-')->limit(80, '')->toString() ?: $mediaId;
             $relativePath = 'uploads/whatsapp-media/' . date('Y/m') . '/' . $safeName . '-' . uniqid() . '.' . $extension;
-            $absolutePath = public_path($relativePath);
+            $absolutePath = $this->publicAssetPath($relativePath);
 
             File::ensureDirectoryExists(dirname($absolutePath));
             $contents = $file->body();
@@ -436,5 +436,17 @@ class MetaWhatsAppService
             return pathinfo($filename, PATHINFO_FILENAME) . '.' . $extension;
         }
         return $safeName . '.' . $extension;
+    }
+
+    private function publicAssetPath(string $relativePath): string
+    {
+        $relativePath = ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath), DIRECTORY_SEPARATOR);
+        $servedRoot = dirname(dirname(base_path())) . DIRECTORY_SEPARATOR . 'clinic-backend';
+
+        if (is_dir($servedRoot) && file_exists($servedRoot . DIRECTORY_SEPARATOR . 'index.php')) {
+            return $servedRoot . DIRECTORY_SEPARATOR . $relativePath;
+        }
+
+        return public_path($relativePath);
     }
 }

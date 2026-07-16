@@ -382,7 +382,7 @@ class AgentController extends Controller
 
     protected function storeOutboundUpload(UploadedFile $file): array
     {
-        $directory = public_path('uploads/chat-media/' . date('Y/m'));
+        $directory = $this->publicAssetPath('uploads/chat-media/' . date('Y/m'));
         File::ensureDirectoryExists($directory);
 
         $extension = $file->getClientOriginalExtension() ?: $file->extension() ?: 'bin';
@@ -399,5 +399,17 @@ class AgentController extends Controller
             'url' => url($relativePath),
             'mime' => $file->getMimeType(),
         ];
+    }
+
+    protected function publicAssetPath(string $relativePath): string
+    {
+        $relativePath = ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath), DIRECTORY_SEPARATOR);
+        $servedRoot = dirname(dirname(base_path())) . DIRECTORY_SEPARATOR . 'clinic-backend';
+
+        if (is_dir($servedRoot) && file_exists($servedRoot . DIRECTORY_SEPARATOR . 'index.php')) {
+            return $servedRoot . DIRECTORY_SEPARATOR . $relativePath;
+        }
+
+        return public_path($relativePath);
     }
 }

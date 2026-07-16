@@ -79,11 +79,10 @@ function renderMessageMedia(message: MessageRecord) {
   );
 }
 
-type AttachmentKind = "image" | "audio" | "video" | "file";
+type AttachmentKind = "image" | "video" | "file";
 
 const ATTACHMENT_ACCEPT: Record<AttachmentKind, string> = {
   image: "image/*",
-  audio: "audio/*",
   video: "video/*",
   file: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar",
 };
@@ -208,7 +207,7 @@ export function AgentWorkspace() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [composerBody, setComposerBody] = useState("");
   const [composerMedia, setComposerMedia] = useState<File | null>(null);
-  const [attachmentKind, setAttachmentKind] = useState<AttachmentKind>("image");
+  const [attachmentKind, setAttachmentKind] = useState<AttachmentKind | null>(null);
   const [leadName, setLeadName] = useState("");
   const [leadProfileName, setLeadProfileName] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
@@ -481,6 +480,7 @@ export function AgentWorkspace() {
       updateConversationSnapshot(selectedConversation.id, response.messages);
       setComposerBody("");
       setComposerMedia(null);
+      setAttachmentKind(null);
       if (attachmentInputRef.current) {
         attachmentInputRef.current.value = "";
       }
@@ -863,7 +863,6 @@ export function AgentWorkspace() {
                         <div className="flex flex-wrap items-center gap-2">
                           {([
                             { key: "image", label: "Photo" },
-                            { key: "audio", label: "Voice" },
                             { key: "video", label: "Video" },
                             { key: "file", label: "Document" },
                           ] as { key: AttachmentKind; label: string }[]).map((option) => (
@@ -886,7 +885,7 @@ export function AgentWorkspace() {
                           <input
                             ref={attachmentInputRef}
                             type="file"
-                            accept={ATTACHMENT_ACCEPT[attachmentKind]}
+                            accept={attachmentKind ? ATTACHMENT_ACCEPT[attachmentKind] : undefined}
                             onChange={(event) => setComposerMedia(event.target.files?.[0] ?? null)}
                             className="hidden"
                           />
@@ -898,6 +897,7 @@ export function AgentWorkspace() {
                               type="button"
                               onClick={() => {
                                 setComposerMedia(null);
+                                setAttachmentKind(null);
                                 if (attachmentInputRef.current) {
                                   attachmentInputRef.current.value = "";
                                 }
