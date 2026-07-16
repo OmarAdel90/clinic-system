@@ -3,7 +3,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { fetchCollection, fetchResource, mutateJson } from "@/lib/api";
+import { fetchCollection, fetchResource, mutateFormData, mutateJson } from "@/lib/api";
 import type {
   AgentMetrics,
   Clinic,
@@ -33,6 +33,50 @@ function getPlatformLabel(platform?: string | null) {
 function getMessagePreview(rows: MessageRecord[]) {
   const latest = rows[rows.length - 1];
   return latest?.body || latest?.media_caption || latest?.type || "No messages loaded yet.";
+}
+
+function renderMessageMedia(message: MessageRecord) {
+  if (!message.media_url) {
+    return null;
+  }
+
+  const type = (message.type || "").toLowerCase();
+  const sharedClassName = "mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/5";
+
+  if (type === "image") {
+    return <img src={message.media_url} alt={message.media_caption || "Image attachment"} className={`${sharedClassName} max-h-80 w-full object-cover`} />;
+  }
+
+  if (type === "audio" || (message.media_mime || "").startsWith("audio/")) {
+    return (
+      <div className={sharedClassName}>
+        <audio controls preload="metadata" className="w-full">
+          <source src={message.media_url} type={message.media_mime || undefined} />
+        </audio>
+      </div>
+    );
+  }
+
+  if (type === "video" || (message.media_mime || "").startsWith("video/")) {
+    return (
+      <div className={sharedClassName}>
+        <video controls preload="metadata" className="max-h-80 w-full bg-black">
+          <source src={message.media_url} type={message.media_mime || undefined} />
+        </video>
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={message.media_url}
+      target="_blank"
+      rel="noreferrer"
+      className="mt-3 inline-flex items-center rounded-xl border border-current/20 px-3 py-2 text-xs font-medium underline-offset-2 hover:underline"
+    >
+      Open attachment
+    </a>
+  );
 }
 
 type SearchableOption = {
@@ -154,6 +198,7 @@ export function AgentWorkspace() {
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [composerBody, setComposerBody] = useState("");
+  const [composerMedia, setComposerMedia] = useState<File | null>(null);
   const [leadName, setLeadName] = useState("");
   const [leadProfileName, setLeadProfileName] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
@@ -391,7 +436,7 @@ export function AgentWorkspace() {
   async function handleSendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedConversation || !composerBody.trim()) {
+    if (!selectedConversation || (!composerBody.trim() && !composerMedia)) {
       return;
     }
 
@@ -402,10 +447,21 @@ export function AgentWorkspace() {
     setDetailsNotice(null);
 
     try {
-      const response = await mutateJson<{ messages: MessageRecord[] }>("/agent/messages/send", "POST", {
-        conversation_id: selectedConversation.id,
-        body: composerBody.trim(),
-      });
+      const response = composerMedia
+        ? await (() => {
+            const formData = new FormData();
+            formData.append("conversation_id", String(selectedConversation.id));
+            if (composerBody.trim()) {
+              formData.append("body", composerBody.trim());
+            }
+            formData.append("media", composerMedia);
+
+            return mutateFormData<{ messages: MessageRecord[] }>("/agent/messages/send", "POST", formData);
+          })()
+        : await mutateJson<{ messages: MessageRecord[] }>("/agent/messages/send", "POST", {
+            conversation_id: selectedConversation.id,
+            body: composerBody.trim(),
+          });
 
       setMessages((current) => ({
         ...current,
@@ -413,6 +469,7 @@ export function AgentWorkspace() {
       }));
       updateConversationSnapshot(selectedConversation.id, response.messages);
       setComposerBody("");
+      setComposerMedia(null);
       setDetailsNotice(`Message sent in conversation #${selectedConversation.id}.`);
     } catch (err) {
       if (selectedConversation) {
@@ -755,11 +812,7 @@ export function AgentWorkspace() {
                           <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
                             <div className={`max-w-[85%] rounded-2xl border px-4 py-3 ${outbound ? "border-slate-900 bg-slate-900 text-white" : "border-[var(--line)] bg-[var(--surface)] text-slate-900"}`}>
                               <div className="break-words text-sm leading-6">{message.body || message.media_caption || message.type || "Message"}</div>
-                              {message.media_url ? (
-                                <a href={message.media_url} target="_blank" rel="noreferrer" className={`mt-2 inline-flex text-xs underline ${outbound ? "text-slate-300" : "text-slate-500"}`}>
-                                  Open media
-                                </a>
-                              ) : null}
+                              {renderMessageMedia(message)}
                               <div className={`mt-2 text-[11px] ${outbound ? "text-slate-300" : "text-slate-500"}`}>
                                 {outbound ? message.user?.name || "You" : "Lead"} | {message.status || message.type || "message"} | {formatLocalDateTime(stamp)}
                               </div>
@@ -792,11 +845,32 @@ export function AgentWorkspace() {
                         placeholder="Type a reply to the selected conversation"
                         className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
                       />
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-700">Attachment</label>
+                        <input
+                          type="file"
+                          accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                          onChange={(event) => setComposerMedia(event.target.files?.[0] ?? null)}
+                          className="block w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+                        />
+                        {composerMedia ? (
+                          <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                            <span className="truncate">{composerMedia.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setComposerMedia(null)}
+                              className="shrink-0 rounded-lg border border-[var(--line)] bg-white px-2 py-1 font-medium text-slate-600 transition hover:bg-slate-100"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-xs text-slate-500">Replies are sent through the backend messaging service for this conversation. The active thread refreshes in place while the popup stays open.</div>
                         <button
                           type="submit"
-                          disabled={sending || !composerBody.trim()}
+                          disabled={sending || (!composerBody.trim() && !composerMedia)}
                           className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                         >
                           {sending ? "Sending..." : "Send Message"}

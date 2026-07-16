@@ -13,6 +13,8 @@ use Modules\Auth\Models\User;
 use Modules\Lead\Models\Lead;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
 
 class AgentController extends Controller
 {
@@ -107,9 +109,10 @@ class AgentController extends Controller
     {
         $request->validate([
             'conversation_id' => 'required|exists:conversations,id',
-            'body'            => 'required_without:media_url|string',
-            'media_url'       => 'required_without:body|string',
-            'media_type'      => 'required_with:media_url|string|in:image,audio,video,file',
+            'body'            => 'required_without_all:media_url,media|string|nullable',
+            'media_url'       => 'required_without_all:body,media|string|nullable',
+            'media_type'      => 'nullable|string|in:image,audio,video,file,document',
+            'media'           => 'required_without_all:body,media_url|file|max:20480',
         ]);
 
         $conversation = Conversation::findOrFail($request->conversation_id);
@@ -127,11 +130,13 @@ class AgentController extends Controller
         }
 
         try {
+            $mediaUpload = $request->file('media');
             $result = $this->dispatchOutboundMessage(
                 $conversation,
                 $request->body,
                 $request->media_url,
                 $request->media_type,
+                $mediaUpload,
                 $whatsapp,
                 $facebook,
             );
@@ -141,7 +146,7 @@ class AgentController extends Controller
                 'lead_id' => $lead->id,
                 'user_id' => auth()->id(),
                 'direction' => 'outbound',
-                'type' => $request->media_url ? $request->media_type : 'text',
+                'type' => $request->media_url || $request->file('media') ? ($request->media_type ?: 'document') : 'text',
                 'body' => $request->body,
                 'media_url' => $request->media_url,
                 'status' => 'failed',
@@ -192,7 +197,8 @@ class AgentController extends Controller
             $result = $this->dispatchOutboundMessage(
                 $conversation,
                 $message->body,
-                null,
+                $message->media_url,
+                $message->type,
                 null,
                 $whatsapp,
                 $facebook,
@@ -237,6 +243,7 @@ class AgentController extends Controller
         ?string $body,
         ?string $mediaUrl,
         ?string $mediaType,
+        ?UploadedFile $mediaUpload,
         MetaWhatsAppService $whatsapp,
         MetaFacebookService $facebook,
     ): array {
@@ -254,10 +261,30 @@ class AgentController extends Controller
                 throw new \RuntimeException('This WhatsApp lead has no sendable recipient identifier.');
             }
 
+            if ($mediaUpload) {
+                $mimeType = $whatsapp->supportedMimeType(
+                    $mediaUpload->getClientOriginalExtension(),
+                    $mediaUpload->getMimeType()
+                );
+                $uploadedMediaId = $whatsapp->uploadMedia($mediaUpload->getRealPath(), $mimeType);
+                $resolvedType = $this->resolveMessageMediaType($mimeType, $mediaUpload->getClientOriginalExtension(), $whatsapp, $facebook);
+
+                return $whatsapp->sendMedia(
+                    $recipient,
+                    $resolvedType,
+                    $uploadedMediaId,
+                    caption: $body,
+                    filename: $resolvedType === 'document' ? $mediaUpload->getClientOriginalName() : null,
+                    conversationId: $conversation->id,
+                    leadId: $lead->id,
+                    userId: auth()->id()
+                );
+            }
+
             if ($mediaUrl) {
                 return $whatsapp->sendMedia(
                     $recipient,
-                    $mediaType,
+                    $mediaType === 'file' ? 'document' : $mediaType,
                     $mediaUrl,
                     caption: $body,
                     conversationId: $conversation->id,
@@ -281,10 +308,25 @@ class AgentController extends Controller
             throw new \RuntimeException('This conversation has no Meta recipient identifier.');
         }
 
+        if ($mediaUpload) {
+            $stored = $this->storeOutboundUpload($mediaUpload);
+            $resolvedType = $this->resolveMessageMediaType($stored['mime'], $mediaUpload->getClientOriginalExtension(), $whatsapp, $facebook);
+
+            return $facebook->sendAttachment(
+                $recipient,
+                $resolvedType,
+                $stored['url'],
+                platform: $platform,
+                conversationId: $conversation->id,
+                leadId: $lead->id,
+                userId: auth()->id()
+            );
+        }
+
         if ($mediaUrl) {
             return $facebook->sendAttachment(
                 $recipient,
-                $mediaType,
+                $mediaType === 'file' ? 'document' : $mediaType,
                 $mediaUrl,
                 platform: $platform,
                 conversationId: $conversation->id,
@@ -313,5 +355,49 @@ class AgentController extends Controller
             ->get()
             ->reverse()
             ->values();
+    }
+
+    protected function resolveMessageMediaType(
+        ?string $mimeType,
+        ?string $extension,
+        MetaWhatsAppService $whatsapp,
+        MetaFacebookService $facebook,
+    ): string {
+        $normalizedMime = strtolower((string) $mimeType);
+
+        if ($normalizedMime !== '') {
+            $type = $whatsapp->mediaTypeFromMime($normalizedMime);
+            return $type === 'document' ? 'document' : $type;
+        }
+
+        $extension = strtolower((string) $extension);
+
+        return match (true) {
+            in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true) => 'image',
+            in_array($extension, ['aac', 'amr', 'm4a', 'mp3', 'ogg', 'opus', 'wav', 'webm'], true) => 'audio',
+            in_array($extension, ['mp4', 'mov', '3gp'], true) => 'video',
+            default => 'document',
+        };
+    }
+
+    protected function storeOutboundUpload(UploadedFile $file): array
+    {
+        $directory = public_path('uploads/chat-media/' . date('Y/m'));
+        File::ensureDirectoryExists($directory);
+
+        $extension = $file->getClientOriginalExtension() ?: $file->extension() ?: 'bin';
+        $safeName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = str($safeName)->slug('-')->limit(80, '')->toString() ?: 'chat-media';
+        $filename = $safeName . '-' . uniqid() . '.' . strtolower($extension);
+
+        $file->move($directory, $filename);
+
+        $relativePath = 'uploads/chat-media/' . date('Y/m') . '/' . $filename;
+
+        return [
+            'path' => $relativePath,
+            'url' => url($relativePath),
+            'mime' => $file->getMimeType(),
+        ];
     }
 }

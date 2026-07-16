@@ -185,6 +185,8 @@ export type MessageRecord = {
   direction?: string | null;
   media_url?: string | null;
   media_caption?: string | null;
+  media_mime?: string | null;
+  media_size?: string | number | null;
   status?: string | null;
   sent_at?: string | null;
   created_at?: string | null;

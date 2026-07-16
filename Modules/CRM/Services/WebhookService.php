@@ -133,6 +133,7 @@ class WebhookService
 
         $body = $this->extractMessageBody($type, $msgData);
         $media = $this->extractMedia($type, $msgData);
+        $media = $this->hydrateWhatsAppInboundMedia($media, $msgData);
 
         Message::create([
             'conversation_id'  => $conversation->id,
@@ -366,6 +367,7 @@ class WebhookService
             $media = $msgData[$type] ?? [];
 
             return [
+                'id'      => $media['id'] ?? null,
                 'url'     => null,
                 'caption' => $media['caption'] ?? null,
                 'mime'    => $media['mime_type'] ?? null,
@@ -374,6 +376,34 @@ class WebhookService
         }
 
         return null;
+    }
+
+    protected function hydrateWhatsAppInboundMedia(?array $media, array $msgData): ?array
+    {
+        if (! is_array($media) || blank($media['id'] ?? null)) {
+            return $media;
+        }
+
+        try {
+            $downloaded = app(MetaWhatsAppService::class)->downloadMedia(
+                (string) $media['id'],
+                $msgData['document']['filename'] ?? null,
+            );
+
+            if (! $downloaded) {
+                return $media;
+            }
+
+            $media['url'] = url($downloaded['path']);
+            $media['mime'] = $downloaded['mime_type'] ?? $media['mime'];
+        } catch (\Throwable $e) {
+            Log::warning('Unable to download inbound WhatsApp media.', [
+                'media_id' => $media['id'],
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $media;
     }
 
     protected function resolveEventType(?string $object, array $entries): string
