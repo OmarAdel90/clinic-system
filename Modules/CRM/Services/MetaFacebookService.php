@@ -169,10 +169,14 @@ class MetaFacebookService
 
     private function token(string $platform): string
     {
-        $token = (string) config('services.meta_facebook.page_access_token');
+        $token = $platform === 'instagram'
+            ? (string) (config('services.meta_facebook.instagram_access_token') ?: config('services.meta_facebook.page_access_token'))
+            : (string) config('services.meta_facebook.page_access_token');
 
         if (blank($token)) {
-            throw new RuntimeException('Facebook Page Access Token is not configured.');
+            throw new RuntimeException($platform === 'instagram'
+                ? 'Instagram access token is not configured.'
+                : 'Facebook Page Access Token is not configured.');
         }
 
         return $token;

@@ -44,7 +44,10 @@ return [
     ],
 
     'meta_facebook' => [
+        'page_id'           => env('META_FACEBOOK_PAGE_ID'),
         'page_access_token' => env('META_FACEBOOK_PAGE_ACCESS_TOKEN'),
+        'instagram_access_token' => env('META_INSTAGRAM_ACCESS_TOKEN'),
+        'app_id'            => env('META_APP_ID'),
         'api_version'       => env('META_API_VERSION', 'v20.0'),
         'verify_token'      => env('META_FACEBOOK_VERIFY_TOKEN', 'clinic_verify'),
     ],

@@ -52,8 +52,6 @@ class RolePermissionSeeder extends Seeder
             'create',
             'update',
             'delete',
-            'restore',
-            'force_delete',
         ];
 
         foreach ($models as $model) {

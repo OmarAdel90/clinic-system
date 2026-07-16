@@ -9,11 +9,10 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Modules\Auth\Support\SeededAdmin;
 
 class UserService
 {
-    private const PROTECTED_ADMIN_EMAIL = 'super@clinic.com';
-
     public function getAll(): Collection
     {
         try {
@@ -108,7 +107,7 @@ class UserService
     public function delete(User $user): void
     {
         try {
-            if ($user->email === self::PROTECTED_ADMIN_EMAIL) {
+            if ($user->email === SeededAdmin::email()) {
                 throw new \Exception('The seeded admin user cannot be deleted.', 422);
             }
 
