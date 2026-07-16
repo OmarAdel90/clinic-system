@@ -101,25 +101,38 @@ class WebhookService
             return;
         }
 
-        $lead = Lead::firstOrCreate(
-            ['whatsapp_id' => $waId],
-            [
-                'platform'    => 'whatsapp',
-                'phone'       => $phone,
-                'name'        => $profileName,
-                'profile_name' => $profileName,
-                'campaign_id' => $this->resolveCampaignId($metaCampaignId),
-                'metadata'    => $this->buildLeadMetadata('whatsapp_webhook', $metaCampaignId, $value),
-            ]
-        );
+        $lead = $this->resolveWhatsAppLead($waId, $phone);
 
-        if (!$lead->wasRecentlyCreated && $profileName && $lead->name !== $profileName) {
-            $lead->update([
+        if (! $lead) {
+            $lead = Lead::create([
+                'whatsapp_id'  => $waId,
+                'platform'     => 'whatsapp',
+                'phone'        => $phone,
+                'name'         => $profileName,
                 'profile_name' => $profileName,
-                'name' => $profileName,
-                'campaign_id' => $lead->campaign_id ?: $this->resolveCampaignId($metaCampaignId),
-                'metadata' => $this->mergeLeadMetadata($lead->metadata, $this->buildLeadMetadata('whatsapp_webhook', $metaCampaignId, $value)),
+                'campaign_id'  => $this->resolveCampaignId($metaCampaignId),
+                'metadata'     => $this->buildLeadMetadata('whatsapp_webhook', $metaCampaignId, $value),
             ]);
+        }
+
+        $leadUpdates = [
+            'whatsapp_id' => $lead->whatsapp_id ?: $waId,
+            'phone' => $lead->phone ?: $phone,
+            'platform' => $lead->platform ?: 'whatsapp',
+            'campaign_id' => $lead->campaign_id ?: $this->resolveCampaignId($metaCampaignId),
+            'metadata' => $this->mergeLeadMetadata($lead->metadata, $this->buildLeadMetadata('whatsapp_webhook', $metaCampaignId, $value)),
+        ];
+
+        if ($profileName) {
+            $leadUpdates['profile_name'] = $profileName;
+
+            if (blank($lead->name)) {
+                $leadUpdates['name'] = $profileName;
+            }
+        }
+
+        if ($this->hasDirtyValues($lead, $leadUpdates)) {
+            $lead->update($leadUpdates);
         }
 
         $conversation = Conversation::firstOrCreate(
@@ -155,6 +168,32 @@ class WebhookService
             'last_message_time' => now(),
             'unread_amount'     => DB::raw('unread_amount + 1'),
         ]);
+    }
+
+    protected function resolveWhatsAppLead(string $waId, ?string $phone): ?Lead
+    {
+        $phoneCandidates = array_values(array_unique(array_filter([
+            $phone,
+            $waId,
+            $phone ? '+' . ltrim($phone, '+') : null,
+            '+' . ltrim($waId, '+'),
+        ])));
+
+        return Lead::query()
+            ->where('whatsapp_id', $waId)
+            ->orWhereIn('phone', $phoneCandidates)
+            ->first();
+    }
+
+    protected function hasDirtyValues(Lead $lead, array $updates): bool
+    {
+        foreach ($updates as $key => $value) {
+            if ($lead->{$key} !== $value) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function handleWhatsAppStatus(array $statusData): void

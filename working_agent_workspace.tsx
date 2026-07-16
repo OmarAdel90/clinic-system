@@ -337,7 +337,7 @@ export function AgentWorkspace() {
 
     const interval = window.setInterval(() => {
       void loadMessages(selectedConversation.id, { force: true, silent: true });
-    }, 15000);
+    }, 5000);
 
     return () => window.clearInterval(interval);
   }, [detailsOpen, selectedConversation?.id]);
@@ -841,9 +841,9 @@ export function AgentWorkspace() {
                       <textarea
                         value={composerBody}
                         onChange={(event) => setComposerBody(event.target.value)}
-                        rows={5}
+                        rows={3}
                         placeholder="Type a reply to the selected conversation"
-                        className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                        className="w-full resize-y rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
                       />
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-slate-700">Attachment</label>
