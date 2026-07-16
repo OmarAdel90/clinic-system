@@ -410,7 +410,8 @@ class WebhookService
                 'url'     => null,
                 'caption' => $media['caption'] ?? null,
                 'mime'    => $media['mime_type'] ?? null,
-                'size'    => $media['sha256'] ?? null,
+                'size'    => isset($media['file_size']) ? (int) $media['file_size'] : null,
+                'filename' => $media['filename'] ?? null,
             ];
         }
 
@@ -435,6 +436,8 @@ class WebhookService
 
             $media['url'] = url($downloaded['path']);
             $media['mime'] = $downloaded['mime_type'] ?? $media['mime'];
+            $media['size'] = $downloaded['size'] ?? $media['size'];
+            $media['filename'] = $downloaded['filename'] ?? ($media['filename'] ?? null);
         } catch (\Throwable $e) {
             Log::warning('Unable to download inbound WhatsApp media.', [
                 'media_id' => $media['id'],

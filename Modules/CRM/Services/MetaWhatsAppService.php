@@ -248,12 +248,14 @@ class MetaWhatsAppService
             $absolutePath = public_path($relativePath);
 
             File::ensureDirectoryExists(dirname($absolutePath));
-            File::put($absolutePath, $file->body());
+            $contents = $file->body();
+            File::put($absolutePath, $contents);
 
             return [
                 'path'     => $relativePath,
                 'mime_type' => $mime,
                 'filename' => $this->downloadFilename($filename, $safeName, $extension),
+                'size' => strlen($contents),
             ];
         } catch (QueryException $e) {
             Log::error(__METHOD__ . ' failed', ['media_id' => $mediaId, 'error' => $e->getMessage()]);

@@ -79,6 +79,15 @@ function renderMessageMedia(message: MessageRecord) {
   );
 }
 
+type AttachmentKind = "image" | "audio" | "video" | "file";
+
+const ATTACHMENT_ACCEPT: Record<AttachmentKind, string> = {
+  image: "image/*",
+  audio: "audio/*",
+  video: "video/*",
+  file: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar",
+};
+
 type SearchableOption = {
   label: string;
   value: string;
@@ -199,6 +208,7 @@ export function AgentWorkspace() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [composerBody, setComposerBody] = useState("");
   const [composerMedia, setComposerMedia] = useState<File | null>(null);
+  const [attachmentKind, setAttachmentKind] = useState<AttachmentKind>("image");
   const [leadName, setLeadName] = useState("");
   const [leadProfileName, setLeadProfileName] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
@@ -221,6 +231,7 @@ export function AgentWorkspace() {
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
   const threadViewportRef = useRef<HTMLDivElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredFollowups = useMemo(() => {
     const term = followupSearch.trim().toLowerCase();
@@ -470,6 +481,9 @@ export function AgentWorkspace() {
       updateConversationSnapshot(selectedConversation.id, response.messages);
       setComposerBody("");
       setComposerMedia(null);
+      if (attachmentInputRef.current) {
+        attachmentInputRef.current.value = "";
+      }
       setDetailsNotice(`Message sent in conversation #${selectedConversation.id}.`);
     } catch (err) {
       if (selectedConversation) {
@@ -846,19 +860,48 @@ export function AgentWorkspace() {
                         className="w-full resize-y rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
                       />
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-slate-700">Attachment</label>
-                        <input
-                          type="file"
-                          accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
-                          onChange={(event) => setComposerMedia(event.target.files?.[0] ?? null)}
-                          className="block w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          {([
+                            { key: "image", label: "Photo" },
+                            { key: "audio", label: "Voice" },
+                            { key: "video", label: "Video" },
+                            { key: "file", label: "Document" },
+                          ] as { key: AttachmentKind; label: string }[]).map((option) => (
+                            <button
+                              key={option.key}
+                              type="button"
+                              onClick={() => {
+                                setAttachmentKind(option.key);
+                                window.setTimeout(() => attachmentInputRef.current?.click(), 0);
+                              }}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                                attachmentKind === option.key
+                                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                  : "border-[var(--line)] bg-white text-slate-600 hover:bg-slate-50"
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                          <input
+                            ref={attachmentInputRef}
+                            type="file"
+                            accept={ATTACHMENT_ACCEPT[attachmentKind]}
+                            onChange={(event) => setComposerMedia(event.target.files?.[0] ?? null)}
+                            className="hidden"
+                          />
+                        </div>
                         {composerMedia ? (
                           <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-slate-50 px-3 py-2 text-xs text-slate-600">
                             <span className="truncate">{composerMedia.name}</span>
                             <button
                               type="button"
-                              onClick={() => setComposerMedia(null)}
+                              onClick={() => {
+                                setComposerMedia(null);
+                                if (attachmentInputRef.current) {
+                                  attachmentInputRef.current.value = "";
+                                }
+                              }}
                               className="shrink-0 rounded-lg border border-[var(--line)] bg-white px-2 py-1 font-medium text-slate-600 transition hover:bg-slate-100"
                             >
                               Remove
