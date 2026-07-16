@@ -12,4 +12,5 @@ Route::middleware(['auth:sanctum'])->prefix('agent')->group(function () {
     Route::patch('followups/{followup}/complete', [AgentController::class, 'completeFollowup']);
 
     Route::post('messages/send', [AgentController::class, 'sendMessage']);
+    Route::post('messages/{message}/retry', [AgentController::class, 'retryMessage']);
 });

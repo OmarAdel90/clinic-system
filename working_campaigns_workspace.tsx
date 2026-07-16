@@ -102,6 +102,7 @@ export function CampaignsWorkspace() {
   const [editForm, setEditForm] = useState<CampaignForm>(initialForm);
   const [loading, setLoading] = useState(true);
   const [loadingMeta, setLoadingMeta] = useState(false);
+  const [refreshingImported, setRefreshingImported] = useState(false);
   const [savingCreate, setSavingCreate] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [importingMeta, setImportingMeta] = useState(false);
@@ -143,6 +144,10 @@ export function CampaignsWorkspace() {
     const term = metaSearch.trim().toLowerCase();
 
     return availableMetaCampaigns.filter((campaign) => {
+      if (campaign.imported) {
+        return false;
+      }
+
       if (!term) {
         return true;
       }
@@ -180,6 +185,17 @@ export function CampaignsWorkspace() {
       setError(err instanceof Error ? err.message : "Unable to load campaigns.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function refreshImportedCampaigns() {
+    setRefreshingImported(true);
+    setError(null);
+
+    try {
+      await load();
+    } finally {
+      setRefreshingImported(false);
     }
   }
 
@@ -319,7 +335,20 @@ export function CampaignsWorkspace() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <Panel title="Campaign List" description="Search the list, then open a campaign popup to inspect or update it.">
+        <Panel
+          title="Campaign List"
+          description="Search the imported/local campaign list, then open a campaign popup to inspect or update it."
+          actions={
+            <button
+              type="button"
+              onClick={() => void refreshImportedCampaigns()}
+              disabled={refreshingImported || loading}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshingImported ? "Refreshing..." : "Refresh Imported"}
+            </button>
+          }
+        >
           <div className="mb-4">
             <WorkflowInput label="Search" name="campaign-search" value={search} onChange={setSearch} placeholder="Name, platform, status, or id" />
           </div>
@@ -437,7 +466,7 @@ export function CampaignsWorkspace() {
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
-                  No campaigns were returned. Make sure the Meta ads access token is valid and an ad account is selected in Settings.
+                  No unimported campaigns were returned. Make sure the Meta ads access token is valid, an ad account is selected in Settings, or that there are still campaigns left to import.
                 </div>
               )}
             </div>

@@ -188,6 +188,8 @@ export type MessageRecord = {
   status?: string | null;
   sent_at?: string | null;
   created_at?: string | null;
+  failed_at?: string | null;
+  error_message?: string | null;
   user?: User | null;
 };
 

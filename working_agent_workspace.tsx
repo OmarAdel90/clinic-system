@@ -165,6 +165,7 @@ export function AgentWorkspace() {
   const [conversationPlatform, setConversationPlatform] = useState("all");
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [retryingMessageId, setRetryingMessageId] = useState<number | null>(null);
   const [savingLead, setSavingLead] = useState(false);
   const [assigningClinic, setAssigningClinic] = useState(false);
   const [completingFollowupId, setCompletingFollowupId] = useState<number | null>(null);
@@ -414,9 +415,37 @@ export function AgentWorkspace() {
       setComposerBody("");
       setDetailsNotice(`Message sent in conversation #${selectedConversation.id}.`);
     } catch (err) {
+      if (selectedConversation) {
+        await loadMessages(selectedConversation.id, { force: true, silent: true });
+      }
       setDetailsError(err instanceof Error ? err.message : "Unable to send message.");
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleRetryMessage(messageId: number) {
+    if (!selectedConversation) {
+      return;
+    }
+
+    setRetryingMessageId(messageId);
+    setDetailsError(null);
+    setDetailsNotice(null);
+
+    try {
+      const response = await mutateJson<{ messages: MessageRecord[] }>(`/agent/messages/${messageId}/retry`, "POST", {});
+      setMessages((current) => ({
+        ...current,
+        [selectedConversation.id]: response.messages,
+      }));
+      updateConversationSnapshot(selectedConversation.id, response.messages);
+      setDetailsNotice("Message retried successfully.");
+    } catch (err) {
+      await loadMessages(selectedConversation.id, { force: true, silent: true });
+      setDetailsError(err instanceof Error ? err.message : "Unable to retry message.");
+    } finally {
+      setRetryingMessageId(null);
     }
   }
 
@@ -720,6 +749,7 @@ export function AgentWorkspace() {
                       {selectedMessages.map((message) => {
                         const outbound = message.direction === "outbound";
                         const stamp = message.sent_at || message.created_at;
+                        const failed = outbound && message.status === "failed";
 
                         return (
                           <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
@@ -733,6 +763,21 @@ export function AgentWorkspace() {
                               <div className={`mt-2 text-[11px] ${outbound ? "text-slate-300" : "text-slate-500"}`}>
                                 {outbound ? message.user?.name || "You" : "Lead"} | {message.status || message.type || "message"} | {formatLocalDateTime(stamp)}
                               </div>
+                              {failed ? (
+                                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                                  <div className="text-[11px] text-rose-200">
+                                    {message.error_message || "Message failed to send."}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleRetryMessage(message.id)}
+                                    disabled={retryingMessageId === message.id}
+                                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-medium text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {retryingMessageId === message.id ? "Retrying..." : "Retry"}
+                                  </button>
+                                </div>
+                              ) : null}
                             </div>
                           </div>
                         );
