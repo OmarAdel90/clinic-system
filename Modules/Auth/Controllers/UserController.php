@@ -4,19 +4,20 @@ namespace Modules\Auth\Controllers;
 
 use App\Http\Controllers\Controller;
 use Modules\Auth\Models\User;
-use Modules\Auth\Services\UserService;
+use Modules\Auth\Requests\IndexUserRequest;
 use Modules\Auth\Requests\StoreUserRequest;
-use Modules\Auth\Requests\UpdateUserRequest;
 use Modules\Auth\Requests\SyncUserRolesRequest;
+use Modules\Auth\Requests\UpdateUserRequest;
+use Modules\Auth\Services\UserService;
 use Illuminate\Http\JsonResponse;
 
 class UserController extends Controller
 {
     public function __construct(protected UserService $service) {}
 
-    public function index(): JsonResponse
+    public function index(IndexUserRequest $request): JsonResponse
     {
-        return response()->json($this->service->getAll());
+        return response()->json($this->service->getAll($request->validated()));
     }
 
     public function show(User $user): JsonResponse

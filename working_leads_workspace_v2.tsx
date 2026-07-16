@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchCollection, mutateJson, removeResource } from "@/lib/api";
+import { fetchCollection, fetchResource, mutateJson, removeResource } from "@/lib/api";
 import type { Campaign, Clinic, Conversation, Lead, LeadStatus, User } from "@/lib/types";
 import { formatLocalDateTime, formatRelativeDateLabel } from "@/lib/time";
 import { PageHeader } from "@/components/page-header";
@@ -34,6 +34,14 @@ type LeadDetailsView = "overview" | "conversations" | "actions";
 const NEXT_QUEUE_OPTION = "__next_queue__";
 const LEADS_PAGE_SIZE = 10;
 
+type PaginatedResponse<T> = {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
 function getLeadDisplayName(lead?: Lead | (Lead & { arabic_name?: string | null }) | null) {
   if (!lead) return "Unknown lead";
   return lead.name || (lead as Lead & { arabic_name?: string | null }).arabic_name || lead.profile_name || `Lead #${lead.id}`;
@@ -45,6 +53,11 @@ function getLeadStatusDisplay(lead: Lead) {
 
 function getLeadStatusColor(lead: Lead) {
   return lead.lead_status?.color || null;
+}
+
+function buildSearchPath(search: string) {
+  const term = search.trim();
+  return term ? `/leads?search=${encodeURIComponent(term)}` : "/leads";
 }
 
 export function LeadsWorkspaceV2() {
@@ -77,41 +90,15 @@ export function LeadsWorkspaceV2() {
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
   const [leadPage, setLeadPage] = useState(1);
+  const [leadTotalPages, setLeadTotalPages] = useState(1);
+  const [leadTotalItems, setLeadTotalItems] = useState(0);
+  const skipSearchFetchRef = useRef(true);
 
-  const filteredLeads = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return leads.filter((lead) => {
-      const leadStatus = lead.lead_status?.key || String(lead.lead_status_id ?? "new");
-      const matchesSearch =
-        term.length === 0 ||
-        [lead.name, lead.profile_name, lead.phone, lead.platform, String(lead.id)]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(term));
-
-      const matchesStatus = statusFilter === "all" || leadStatus === statusFilter;
-      const matchesAssignmentStatus =
-        assignmentStatusFilter === "all" ||
-        (assignmentStatusFilter === "assigned" && Boolean(lead.assignment_state?.user_id)) ||
-        (assignmentStatusFilter === "unassigned" && !lead.assignment_state?.user_id);
-      const matchesClinicAssignedStatus =
-        clinicAssignedStatusFilter === "all" ||
-        (clinicAssignedStatusFilter === "assigned" && Boolean(lead.clinic_id)) ||
-        (clinicAssignedStatusFilter === "unassigned" && !lead.clinic_id);
-
-      return matchesSearch && matchesStatus && matchesAssignmentStatus && matchesClinicAssignedStatus;
-    });
-  }, [assignmentStatusFilter, clinicAssignedStatusFilter, leads, search, statusFilter]);
-
-  const leadTotalPages = Math.max(1, Math.ceil(filteredLeads.length / LEADS_PAGE_SIZE));
-  const paginatedLeads = useMemo(
-    () => filteredLeads.slice((leadPage - 1) * LEADS_PAGE_SIZE, leadPage * LEADS_PAGE_SIZE),
-    [filteredLeads, leadPage],
-  );
+  const paginatedLeads = useMemo(() => leads, [leads]);
 
   const selectedLead = useMemo(
-    () => filteredLeads.find((lead) => lead.id === selectedLeadId) ?? leads.find((lead) => lead.id === selectedLeadId) ?? filteredLeads[0] ?? leads[0] ?? null,
-    [filteredLeads, leads, selectedLeadId],
+    () => leads.find((lead) => lead.id === selectedLeadId) ?? leads[0] ?? null,
+    [leads, selectedLeadId],
   );
 
   useEffect(() => {
@@ -144,7 +131,7 @@ export function LeadsWorkspaceV2() {
     };
   }, [leads]);
 
-  async function load(options?: { silent?: boolean }) {
+  async function loadLeadRows(searchTerm = search, page = 1, options?: { silent?: boolean }) {
     if (options?.silent) {
       setRefreshing(true);
     } else {
@@ -153,32 +140,34 @@ export function LeadsWorkspaceV2() {
 
     setError(null);
     try {
-      const [leadRows, campaignRows, statusRows, clinicRows, userRows] = await Promise.all([
-        fetchCollection<Lead>("/leads"),
-        fetchCollection<Campaign>("/campaigns"),
-        fetchCollection<LeadStatus>("/lead-statuses").catch(() => []),
-        fetchCollection<Clinic>("/clinics"),
-        fetchCollection<User>("/users"),
-      ]);
+      const params = new URLSearchParams();
+      const term = searchTerm.trim();
+      if (term) params.set("search", term);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (assignmentStatusFilter !== "all") params.set("assignment_status", assignmentStatusFilter);
+      if (clinicAssignedStatusFilter !== "all") params.set("clinic_assignment_status", clinicAssignedStatusFilter);
+      params.set("page", String(page));
+      params.set("per_page", String(LEADS_PAGE_SIZE));
 
-      setLeads(leadRows);
-      setCampaigns(campaignRows);
-      setStatuses(statusRows);
-      setClinics(clinicRows);
-      setUsers(userRows);
+      const leadRows = await fetchResource<PaginatedResponse<Lead>>(`/leads?${params.toString()}`);
+
+      setLeads(leadRows.data);
+      setLeadPage(leadRows.current_page);
+      setLeadTotalPages(Math.max(1, leadRows.last_page));
+      setLeadTotalItems(leadRows.total);
       setSelectedLeadId((current) => {
         if (leadFromQuery) {
           const requestedId = Number(leadFromQuery);
-          if (!Number.isNaN(requestedId) && leadRows.some((lead) => lead.id === requestedId)) {
+          if (!Number.isNaN(requestedId) && leadRows.data.some((lead) => lead.id === requestedId)) {
             return requestedId;
           }
         }
 
-        if (current && leadRows.some((lead) => lead.id === current)) {
+        if (current && leadRows.data.some((lead) => lead.id === current)) {
           return current;
         }
 
-        return leadRows[0]?.id ?? null;
+        return leadRows.data[0]?.id ?? null;
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load leads.");
@@ -188,9 +177,27 @@ export function LeadsWorkspaceV2() {
     }
   }
 
+  async function loadLookups() {
+    try {
+      const [campaignRows, statusRows, clinicRows, userRows] = await Promise.all([
+        fetchCollection<Campaign>("/campaigns"),
+        fetchCollection<LeadStatus>("/lead-statuses").catch(() => []),
+        fetchCollection<Clinic>("/clinics"),
+        fetchCollection<User>("/users"),
+      ]);
+
+      setCampaigns(campaignRows);
+      setStatuses(statusRows);
+      setClinics(clinicRows);
+      setUsers(userRows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load leads.");
+    }
+  }
+
   useEffect(() => {
     queueMicrotask(() => {
-      void load();
+      void Promise.all([loadLeadRows(""), loadLookups()]);
     });
   }, [leadFromQuery]);
 
@@ -201,14 +208,17 @@ export function LeadsWorkspaceV2() {
   }, [leadFromQuery, selectedLeadId]);
 
   useEffect(() => {
-    setLeadPage(1);
-  }, [search, statusFilter, assignmentStatusFilter, clinicAssignedStatusFilter]);
-
-  useEffect(() => {
-    if (leadPage > leadTotalPages) {
-      setLeadPage(leadTotalPages);
+    if (skipSearchFetchRef.current) {
+      skipSearchFetchRef.current = false;
+      return;
     }
-  }, [leadPage, leadTotalPages]);
+
+    const timeout = window.setTimeout(() => {
+      void loadLeadRows(search, 1);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [search, statusFilter, assignmentStatusFilter, clinicAssignedStatusFilter]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -228,7 +238,7 @@ export function LeadsWorkspaceV2() {
       });
       setForm(initialForm);
       setCreateNotice("Lead created successfully.");
-      await load({ silent: true });
+      await loadLeadRows(search, leadPage, { silent: true });
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Unable to create lead.");
     } finally {
@@ -286,7 +296,7 @@ export function LeadsWorkspaceV2() {
         }
       }
 
-      await load({ silent: true });
+      await loadLeadRows(search, leadPage, { silent: true });
       setDetailsNotice("Lead actions saved successfully.");
     } catch (err) {
       setDetailsError(err instanceof Error ? err.message : "Unable to save lead actions.");
@@ -309,7 +319,7 @@ export function LeadsWorkspaceV2() {
         setSelectedLeadId(null);
         setDetailsOpen(false);
       }
-      await load({ silent: true });
+      await loadLeadRows(search, leadPage, { silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to delete lead.");
     } finally {
@@ -341,7 +351,7 @@ export function LeadsWorkspaceV2() {
             </button>
             <button
               type="button"
-              onClick={() => void load({ silent: true })}
+              onClick={() => void loadLeadRows(search, leadPage, { silent: true })}
               className="rounded-lg border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               {refreshing ? "Refreshing..." : "Refresh"}
@@ -436,8 +446,8 @@ export function LeadsWorkspaceV2() {
                 </button>
               );
             })}
-            {filteredLeads.length === 0 ? <div className="text-sm text-slate-500">No leads match the current filters.</div> : null}
-            <PaginationControls page={leadPage} totalPages={leadTotalPages} totalItems={filteredLeads.length} pageSize={LEADS_PAGE_SIZE} itemLabel="leads" onPageChange={setLeadPage} />
+            {paginatedLeads.length === 0 ? <div className="text-sm text-slate-500">No leads match the current filters.</div> : null}
+            <PaginationControls page={leadPage} totalPages={leadTotalPages} totalItems={leadTotalItems} pageSize={LEADS_PAGE_SIZE} itemLabel="leads" onPageChange={(page) => void loadLeadRows(search, page)} />
           </div>
         ) : null}
       </Panel>

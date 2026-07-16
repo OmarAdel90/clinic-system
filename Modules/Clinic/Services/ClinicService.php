@@ -2,9 +2,11 @@
 
 namespace Modules\Clinic\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Auth\Models\User;
@@ -42,7 +44,7 @@ class ClinicService
         }, $services)));
     }
 
-    public function getAll(User $user): Collection
+    public function getAll(User $user, array $filters = []): LengthAwarePaginator
     {
         try {
             $query = Clinic::with('warehouse');
@@ -55,12 +57,32 @@ class ClinicService
                 $query->whereIn('id', $clinicIds);
             }
 
-            return $query->get();
+            $search = trim((string) ($filters['search'] ?? ''));
+            if ($search !== '') {
+                $query->where(function (Builder $builder) use ($search) {
+                    $builder
+                        ->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('arabic_name', 'like', '%' . $search . '%')
+                        ->orWhere('phone_number', 'like', '%' . $search . '%')
+                        ->orWhere('address', 'like', '%' . $search . '%')
+                        ->orWhereHas('warehouse', function (Builder $warehouseQuery) use ($search) {
+                            $warehouseQuery->where('name', 'like', '%' . $search . '%');
+                        });
+                });
+            }
+
+            $perPage = max(1, min((int) ($filters['per_page'] ?? 10), 100));
+
+            return $query
+                ->orderBy('name')
+                ->orderByDesc('id')
+                ->paginate($perPage)
+                ->withQueryString();
         } catch (QueryException $e) {
-            Log::error(__METHOD__.' failed', ['error' => $e->getMessage()]);
+            Log::error(__METHOD__.' failed', ['error' => $e->getMessage(), 'filters' => $filters]);
             throw $e;
         } catch (\Throwable $e) {
-            Log::critical(__METHOD__.' encountered an unexpected error', ['error' => $e->getMessage()]);
+            Log::critical(__METHOD__.' encountered an unexpected error', ['error' => $e->getMessage(), 'filters' => $filters]);
             throw $e;
         }
         

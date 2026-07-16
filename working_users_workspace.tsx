@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
-import { fetchCollection, mutateJson, removeResource } from "@/lib/api";
+import { FormEvent, type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
+import { fetchCollection, fetchResource, mutateJson, removeResource } from "@/lib/api";
 import type { Role, User } from "@/lib/types";
 import { formatLocalDateTime } from "@/lib/time";
 import { PageHeader } from "@/components/page-header";
@@ -25,6 +25,14 @@ type UserForm = {
   work_end: string;
   is_active: boolean;
   roles: number[];
+};
+
+type PaginatedResponse<T> = {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
 };
 
 const initialForm: UserForm = {
@@ -110,6 +118,11 @@ function arraysEqual(left: number[], right: number[]) {
   return left.every((value, index) => value === right[index]);
 }
 
+function buildSearchPath(search: string) {
+  const term = search.trim();
+  return term ? `/users?search=${encodeURIComponent(term)}` : "/users";
+}
+
 export function UsersWorkspace() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -127,27 +140,11 @@ export function UsersWorkspace() {
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
   const [userPage, setUserPage] = useState(1);
+  const [userTotalPages, setUserTotalPages] = useState(1);
+  const [userTotalItems, setUserTotalItems] = useState(0);
+  const skipSearchFetchRef = useRef(true);
 
-  const filteredUsers = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return users.filter((user) => {
-      if (!term) {
-        return true;
-      }
-
-      const roleNames = (user.roles || []).map((role) => role.name).join(" ");
-      return [user.name, user.email, user.title, user.phone_number, roleNames, String(user.id)]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term));
-    });
-  }, [search, users]);
-
-  const userTotalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PAGE_SIZE));
-  const paginatedUsers = useMemo(
-    () => filteredUsers.slice((userPage - 1) * USERS_PAGE_SIZE, userPage * USERS_PAGE_SIZE),
-    [filteredUsers, userPage],
-  );
+  const paginatedUsers = useMemo(() => users, [users]);
 
   const selectedUser = useMemo(() => users.find((user) => user.id === selectedId) ?? null, [selectedId, users]);
 
@@ -163,27 +160,40 @@ export function UsersWorkspace() {
     [users],
   );
 
-  async function load() {
-    setLoading(true);
+  async function loadUsers(searchTerm = search, page = 1, options?: { silent?: boolean }) {
+    if (!options?.silent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      const [usersPayload, rolesPayload] = await Promise.all([
-        fetchCollection<User>("/users"),
-        fetchCollection<Role>("/roles"),
-      ]);
-      setUsers(usersPayload);
-      setRoles(rolesPayload);
+      const separator = buildSearchPath(searchTerm).includes("?") ? "&" : "?";
+      const usersPayload = await fetchResource<PaginatedResponse<User>>(`${buildSearchPath(searchTerm)}${separator}page=${page}&per_page=${USERS_PAGE_SIZE}`);
+      setUsers(usersPayload.data);
+      setUserPage(usersPayload.current_page);
+      setUserTotalPages(Math.max(1, usersPayload.last_page));
+      setUserTotalItems(usersPayload.total);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load users.");
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
+    }
+  }
+
+  async function loadRoles() {
+    try {
+      const rolesPayload = await fetchCollection<Role>("/roles");
+      setRoles(rolesPayload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load roles.");
     }
   }
 
   useEffect(() => {
     queueMicrotask(() => {
-      void load();
+      void Promise.all([loadUsers("", 1), loadRoles()]);
     });
   }, []);
 
@@ -192,14 +202,17 @@ export function UsersWorkspace() {
   }, [selectedUser]);
 
   useEffect(() => {
-    setUserPage(1);
-  }, [search]);
-
-  useEffect(() => {
-    if (userPage > userTotalPages) {
-      setUserPage(userTotalPages);
+    if (skipSearchFetchRef.current) {
+      skipSearchFetchRef.current = false;
+      return;
     }
-  }, [userPage, userTotalPages]);
+
+    const timeout = window.setTimeout(() => {
+      void loadUsers(search, 1);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [search]);
 
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -211,7 +224,7 @@ export function UsersWorkspace() {
       await mutateJson<User>("/users", "POST", buildUserPayload(createForm, true));
       setCreateForm(initialForm);
       setNotice("User created successfully.");
-      await load();
+      await loadUsers(search, userPage);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create user.");
     } finally {
@@ -276,6 +289,7 @@ export function UsersWorkspace() {
       setUsers((current) => current.map((user) => (user.id === selectedUser.id ? { ...user, ...mergedUser } : user)));
       setDetailsNotice(`User "${editForm.name}" updated successfully.`);
       setEditForm(toForm(mergedUser));
+      await loadUsers(search, userPage, { silent: true });
     } catch (err) {
       setDetailsError(err instanceof Error ? err.message : "Unable to update user.");
     } finally {
@@ -297,7 +311,7 @@ export function UsersWorkspace() {
         setSelectedId(null);
         setDetailsOpen(false);
       }
-      await load();
+      await loadUsers(search, userPage);
     } catch (err) {
       setDetailsError(err instanceof Error ? err.message : "Unable to delete user.");
     } finally {
@@ -400,7 +414,7 @@ export function UsersWorkspace() {
                   </button>
                 );
               })}
-              <PaginationControls page={userPage} totalPages={userTotalPages} totalItems={filteredUsers.length} pageSize={USERS_PAGE_SIZE} itemLabel="users" onPageChange={setUserPage} />
+              <PaginationControls page={userPage} totalPages={userTotalPages} totalItems={userTotalItems} pageSize={USERS_PAGE_SIZE} itemLabel="users" onPageChange={(page) => void loadUsers(search, page)} />
             </div>
           )}
         </Panel>

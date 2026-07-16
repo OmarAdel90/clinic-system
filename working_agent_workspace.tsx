@@ -122,6 +122,19 @@ type AttachmentKind = "image" | "video" | "file";
 const FOLLOWUPS_PAGE_SIZE = 9;
 const CONVERSATIONS_PAGE_SIZE = 10;
 
+function buildConversationSearchPath(search: string) {
+  const term = search.trim();
+  return term ? `/agent/conversations?search=${encodeURIComponent(term)}` : "/agent/conversations";
+}
+
+type PaginatedResponse<T> = {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
 const ATTACHMENT_ACCEPT: Record<AttachmentKind, string> = {
   image: "image/*",
   video: "video/*",
@@ -272,8 +285,11 @@ export function AgentWorkspace() {
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
   const [followupPage, setFollowupPage] = useState(1);
   const [conversationPage, setConversationPage] = useState(1);
+  const [conversationTotalPages, setConversationTotalPages] = useState(1);
+  const [conversationTotalItems, setConversationTotalItems] = useState(0);
   const threadViewportRef = useRef<HTMLDivElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const skipConversationSearchFetchRef = useRef(true);
 
   const filteredFollowups = useMemo(() => {
     const term = followupSearch.trim().toLowerCase();
@@ -299,41 +315,17 @@ export function AgentWorkspace() {
     });
   }, [followupSearch, followupTiming, followups]);
 
-  const filteredConversations = useMemo(() => {
-    const term = conversationSearch.trim().toLowerCase();
-    const normalizedTerm = term.replace(/\D+/g, "");
-
-    return conversations.filter((conversation) => {
-      const leadName = conversation.lead?.name || "";
-      const leadProfileName = conversation.lead?.profile_name || "";
-      const phone = conversation.lead?.phone || "";
-      const normalizedPhone = phone.replace(/\D+/g, "");
-      const preview = getMessagePreview(messages[conversation.id] ?? []);
-      const matchesSearch =
-        term.length === 0 ||
-        [leadName, leadProfileName, conversation.platform, String(conversation.id), phone, preview]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(term)) ||
-        (normalizedTerm.length > 0 && normalizedPhone.includes(normalizedTerm));
-      const matchesPlatform = conversationPlatform === "all" || conversation.platform === conversationPlatform;
-
-      return matchesSearch && matchesPlatform;
-    });
-  }, [conversationPlatform, conversationSearch, conversations, messages]);
+  const filteredConversations = useMemo(() => conversations, [conversations]);
   const followupTotalPages = Math.max(1, Math.ceil(filteredFollowups.length / FOLLOWUPS_PAGE_SIZE));
   const paginatedFollowups = useMemo(() => {
     const start = (followupPage - 1) * FOLLOWUPS_PAGE_SIZE;
     return filteredFollowups.slice(start, start + FOLLOWUPS_PAGE_SIZE);
   }, [filteredFollowups, followupPage]);
-  const conversationTotalPages = Math.max(1, Math.ceil(filteredConversations.length / CONVERSATIONS_PAGE_SIZE));
-  const paginatedConversations = useMemo(() => {
-    const start = (conversationPage - 1) * CONVERSATIONS_PAGE_SIZE;
-    return filteredConversations.slice(start, start + CONVERSATIONS_PAGE_SIZE);
-  }, [conversationPage, filteredConversations]);
+  const paginatedConversations = useMemo(() => conversations, [conversations]);
 
   const selectedConversation = useMemo(
-    () => filteredConversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations.find((conversation) => conversation.id === selectedConversationId) ?? filteredConversations[0] ?? conversations[0] ?? null,
-    [conversations, filteredConversations, selectedConversationId],
+    () => conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0] ?? null,
+    [conversations, selectedConversationId],
   );
 
   useEffect(() => {
@@ -402,16 +394,23 @@ export function AgentWorkspace() {
   }, [conversationSearch, conversationPlatform]);
 
   useEffect(() => {
+    if (skipConversationSearchFetchRef.current) {
+      skipConversationSearchFetchRef.current = false;
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void loadConversations(conversationSearch, 1, { silent: true });
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [conversationSearch, conversationPlatform]);
+
+  useEffect(() => {
     if (followupPage > followupTotalPages) {
       setFollowupPage(followupTotalPages);
     }
   }, [followupPage, followupTotalPages]);
-
-  useEffect(() => {
-    if (conversationPage > conversationTotalPages) {
-      setConversationPage(conversationTotalPages);
-    }
-  }, [conversationPage, conversationTotalPages]);
 
   useEffect(() => {
     if (!selectedConversation || !detailsOpen) {
@@ -435,27 +434,59 @@ export function AgentWorkspace() {
       const [metricsRow, followupRows, conversationRows, clinicRows, leadStatusRows] = await Promise.all([
         fetchResource<AgentMetrics>("/agent/metrics"),
         fetchCollection<FollowUp>("/agent/followups"),
-        fetchCollection<Conversation>("/agent/conversations"),
+        fetchResource<PaginatedResponse<Conversation>>(`${buildConversationSearchPath(conversationSearch)}${buildConversationSearchPath(conversationSearch).includes("?") ? "&" : "?"}platform=${encodeURIComponent(conversationPlatform)}&page=${conversationPage}&per_page=${CONVERSATIONS_PAGE_SIZE}`),
         clinics.length === 0 ? fetchCollection<Clinic>("/clinics").catch(() => []) : Promise.resolve(clinics),
         leadStatuses.length === 0 ? fetchCollection<LeadStatus>("/lead-statuses").catch(() => []) : Promise.resolve(leadStatuses),
       ]);
 
       setMetrics(metricsRow);
       setFollowups(followupRows);
-      setConversations(conversationRows);
+      setConversations(conversationRows.data);
+      setConversationPage(conversationRows.current_page);
+      setConversationTotalPages(Math.max(1, conversationRows.last_page));
+      setConversationTotalItems(conversationRows.total);
       setClinics(clinicRows);
       setLeadStatuses(leadStatusRows);
       setSelectedConversationId((current) => {
-        if (current && conversationRows.some((conversation) => conversation.id === current)) {
+        if (current && conversationRows.data.some((conversation) => conversation.id === current)) {
           return current;
         }
 
-        return conversationRows[0]?.id ?? null;
+        return conversationRows.data[0]?.id ?? null;
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load agent workspace.");
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  async function loadConversations(searchTerm = conversationSearch, page = 1, options?: { silent?: boolean }) {
+    if (options?.silent) {
+      setRefreshing(true);
+    }
+
+    try {
+      const basePath = buildConversationSearchPath(searchTerm);
+      const separator = basePath.includes("?") ? "&" : "?";
+      const conversationRows = await fetchResource<PaginatedResponse<Conversation>>(`${basePath}${separator}platform=${encodeURIComponent(conversationPlatform)}&page=${page}&per_page=${CONVERSATIONS_PAGE_SIZE}`);
+      setConversations(conversationRows.data);
+      setConversationPage(conversationRows.current_page);
+      setConversationTotalPages(Math.max(1, conversationRows.last_page));
+      setConversationTotalItems(conversationRows.total);
+      setSelectedConversationId((current) => {
+        if (current && conversationRows.data.some((conversation) => conversation.id === current)) {
+          return current;
+        }
+
+        return conversationRows.data[0]?.id ?? null;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load conversations.");
+    } finally {
+      if (options?.silent) {
+        setRefreshing(false);
+      }
     }
   }
 
@@ -825,7 +856,7 @@ export function AgentWorkspace() {
                     );
                   })}
                   {filteredConversations.length === 0 ? <div className="text-sm text-slate-500">No assigned conversations match the current filters.</div> : null}
-                  <PaginationControls page={conversationPage} totalPages={conversationTotalPages} totalItems={filteredConversations.length} pageSize={CONVERSATIONS_PAGE_SIZE} itemLabel="conversations" onPageChange={setConversationPage} />
+                  <PaginationControls page={conversationPage} totalPages={conversationTotalPages} totalItems={conversationTotalItems} pageSize={CONVERSATIONS_PAGE_SIZE} itemLabel="conversations" onPageChange={(page) => void loadConversations(conversationSearch, page)} />
                 </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
-import { fetchCollection, mutateJson, removeResource } from "@/lib/api";
+import { FormEvent, type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
+import { fetchCollection, fetchResource, mutateJson, removeResource } from "@/lib/api";
 import type { Clinic, User, Warehouse } from "@/lib/types";
 import { PageHeader } from "@/components/page-header";
 import { Panel } from "@/components/panel";
@@ -26,6 +26,14 @@ type ClinicForm = {
   services: ServiceRow[];
   doctors: number[];
   warehouse_id: string;
+};
+
+type PaginatedResponse<T> = {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
 };
 
 const initialForm: ClinicForm = {
@@ -148,6 +156,11 @@ function validateClinicForm(form: ClinicForm) {
   return null;
 }
 
+function buildSearchPath(search: string) {
+  const term = search.trim();
+  return term ? `/clinics?search=${encodeURIComponent(term)}` : "/clinics";
+}
+
 export function ClinicsWorkspace() {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -166,35 +179,12 @@ export function ClinicsWorkspace() {
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
   const [clinicPage, setClinicPage] = useState(1);
-
-  const filteredClinics = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return clinics.filter((clinic) => {
-      if (!term) {
-        return true;
-      }
-
-      return [
-        clinic.name,
-        clinic.arabic_name,
-        clinic.phone_number,
-        clinic.address,
-        ...(clinic.departments || []),
-        ...normalizeServices(clinic.services as unknown[] | null | undefined).map((service) => service.name),
-        String(clinic.id),
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term));
-    });
-  }, [clinics, search]);
+  const [clinicTotalPages, setClinicTotalPages] = useState(1);
+  const [clinicTotalItems, setClinicTotalItems] = useState(0);
+  const skipSearchFetchRef = useRef(true);
 
   const selectedClinic = useMemo(() => clinics.find((clinic) => clinic.id === selectedId) ?? null, [clinics, selectedId]);
-  const clinicTotalPages = Math.max(1, Math.ceil(filteredClinics.length / CLINICS_PAGE_SIZE));
-  const paginatedClinics = useMemo(() => {
-    const start = (clinicPage - 1) * CLINICS_PAGE_SIZE;
-    return filteredClinics.slice(start, start + CLINICS_PAGE_SIZE);
-  }, [clinicPage, filteredClinics]);
+  const paginatedClinics = useMemo(() => clinics, [clinics]);
 
   const doctorOptions = useMemo(
     () => users.map((user) => ({ id: user.id, label: user.name || user.email })),
@@ -220,29 +210,44 @@ export function ClinicsWorkspace() {
     [clinics],
   );
 
-  async function load() {
-    setLoading(true);
+  async function loadClinics(searchTerm = search, page = 1, options?: { silent?: boolean }) {
+    if (!options?.silent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      const [clinicPayload, userPayload, warehousePayload] = await Promise.all([
-        fetchCollection<Clinic>("/clinics"),
+      const separator = buildSearchPath(searchTerm).includes("?") ? "&" : "?";
+      const clinicPayload = await fetchResource<PaginatedResponse<Clinic>>(`${buildSearchPath(searchTerm)}${separator}page=${page}&per_page=${CLINICS_PAGE_SIZE}`);
+      setClinics(clinicPayload.data);
+      setClinicPage(clinicPayload.current_page);
+      setClinicTotalPages(Math.max(1, clinicPayload.last_page));
+      setClinicTotalItems(clinicPayload.total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load clinics.");
+    } finally {
+      if (!options?.silent) {
+        setLoading(false);
+      }
+    }
+  }
+
+  async function loadLookups() {
+    try {
+      const [userPayload, warehousePayload] = await Promise.all([
         fetchCollection<User>("/users"),
         fetchCollection<Warehouse>("/warehouses"),
       ]);
-      setClinics(clinicPayload);
       setUsers(userPayload);
       setWarehouses(warehousePayload);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load clinics.");
-    } finally {
-      setLoading(false);
     }
   }
 
   useEffect(() => {
     queueMicrotask(() => {
-      void load();
+      void Promise.all([loadClinics("", 1), loadLookups()]);
     });
   }, []);
 
@@ -251,14 +256,17 @@ export function ClinicsWorkspace() {
   }, [selectedClinic]);
 
   useEffect(() => {
-    setClinicPage(1);
-  }, [search]);
-
-  useEffect(() => {
-    if (clinicPage > clinicTotalPages) {
-      setClinicPage(clinicTotalPages);
+    if (skipSearchFetchRef.current) {
+      skipSearchFetchRef.current = false;
+      return;
     }
-  }, [clinicPage, clinicTotalPages]);
+
+    const timeout = window.setTimeout(() => {
+      void loadClinics(search, 1);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [search]);
 
   useEffect(() => {
     if (!createForm.provides_medication && createForm.warehouse_id) {
@@ -289,7 +297,7 @@ export function ClinicsWorkspace() {
       await mutateJson<Clinic>("/clinics", "POST", buildClinicPayload(createForm, false));
       setCreateForm(initialForm);
       setNotice("Clinic created successfully.");
-      await load();
+      await loadClinics(search, clinicPage);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create clinic.");
     } finally {
@@ -319,7 +327,7 @@ export function ClinicsWorkspace() {
     try {
       await mutateJson<Clinic>(`/clinics/${selectedClinic.id}`, "PATCH", buildClinicPayload(editForm, true));
       setDetailsNotice(`Clinic "${editForm.name}" updated successfully.`);
-      await load();
+      await loadClinics(search, clinicPage);
     } catch (err) {
       setDetailsError(err instanceof Error ? err.message : "Unable to update clinic.");
     } finally {
@@ -341,7 +349,7 @@ export function ClinicsWorkspace() {
         setSelectedId(null);
         setDetailsOpen(false);
       }
-      await load();
+      await loadClinics(search, clinicPage);
     } catch (err) {
       setDetailsError(err instanceof Error ? err.message : "Unable to delete clinic.");
     } finally {
@@ -511,10 +519,10 @@ export function ClinicsWorkspace() {
               <PaginationControls
                 page={clinicPage}
                 totalPages={clinicTotalPages}
-                totalItems={filteredClinics.length}
+                totalItems={clinicTotalItems}
                 pageSize={CLINICS_PAGE_SIZE}
                 itemLabel="clinics"
-                onPageChange={setClinicPage}
+                onPageChange={(page) => void loadClinics(search, page)}
               />
             </div>
           )}

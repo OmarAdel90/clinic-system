@@ -9,6 +9,7 @@ use Modules\Lead\Models\Lead;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Builder;
@@ -47,7 +48,7 @@ class LeadService
         }
     }
 
-    public function getAll(?User $user = null): Collection
+    public function getAll(?User $user = null, array $filters = []): LengthAwarePaginator
     {
         try {
             $query = Lead::with([
@@ -61,12 +62,58 @@ class LeadService
 
             $this->applyVisibilityFilter($query, $user);
 
-            return $query->get();
+            $search = trim((string) ($filters['search'] ?? ''));
+            if ($search !== '') {
+                $query->where(function (Builder $builder) use ($search) {
+                    $builder
+                        ->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('arabic_name', 'like', '%' . $search . '%')
+                        ->orWhere('profile_name', 'like', '%' . $search . '%')
+                        ->orWhere('phone', 'like', '%' . $search . '%');
+                });
+            }
+
+            $status = trim((string) ($filters['status'] ?? ''));
+            if ($status !== '' && $status !== 'all') {
+                $query->where(function (Builder $builder) use ($status) {
+                    $builder->whereHas('leadStatus', function (Builder $statusQuery) use ($status) {
+                        $statusQuery
+                            ->where('key', $status)
+                            ->orWhere('label', $status);
+                    });
+
+                    if (is_numeric($status)) {
+                        $builder->orWhere('lead_status_id', (int) $status);
+                    }
+                });
+            }
+
+            $assignmentStatus = $filters['assignment_status'] ?? null;
+            if ($assignmentStatus === 'assigned') {
+                $query->whereHas('assignmentState');
+            } elseif ($assignmentStatus === 'unassigned') {
+                $query->whereDoesntHave('assignmentState');
+            }
+
+            $clinicAssignmentStatus = $filters['clinic_assignment_status'] ?? null;
+            if ($clinicAssignmentStatus === 'assigned') {
+                $query->whereNotNull('clinic_id');
+            } elseif ($clinicAssignmentStatus === 'unassigned') {
+                $query->whereNull('clinic_id');
+            }
+
+            $perPage = max(1, min((int) ($filters['per_page'] ?? 10), 100));
+
+            return $query
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->paginate($perPage)
+                ->withQueryString();
         } catch (QueryException $e) {
-            Log::error(__METHOD__ . ' failed', ['error' => $e->getMessage()]);
+            Log::error(__METHOD__ . ' failed', ['error' => $e->getMessage(), 'filters' => $filters]);
             throw $e;
         } catch (\Throwable $e) {
-            Log::critical(__METHOD__ . ' encountered an unexpected error', ['error' => $e->getMessage()]);
+            Log::critical(__METHOD__ . ' encountered an unexpected error', ['error' => $e->getMessage(), 'filters' => $filters]);
             throw $e;
         }
     }

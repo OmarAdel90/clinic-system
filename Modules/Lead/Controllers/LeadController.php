@@ -20,7 +20,7 @@ class LeadController extends Controller
 
     public function index(IndexLeadRequest $request): JsonResponse
     {
-        return response()->json($this->service->getAll($request->user()));
+        return response()->json($this->service->getAll($request->user(), $request->validated()));
     }
 
     public function picker(IndexLeadPickerRequest $request): JsonResponse

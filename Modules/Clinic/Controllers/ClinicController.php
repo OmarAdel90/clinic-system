@@ -18,7 +18,7 @@ class ClinicController extends Controller
 
     public function index(IndexClinicRequest $request): JsonResponse
     {
-        return response()->json($this->service->getAll($request->user()));
+        return response()->json($this->service->getAll($request->user(), $request->validated()));
     }
 
     public function show(ShowClinicRequest $request, Clinic $clinic): JsonResponse

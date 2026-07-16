@@ -22,14 +22,42 @@ class AgentController extends Controller
         protected PerformanceMetricsService $performanceMetricsService,
     ) {}
 
-    public function conversations(): JsonResponse
+    public function conversations(Request $request): JsonResponse
     {
-        $user = auth()->user();
+        $validated = $request->validate([
+            'search' => 'nullable|string|max:255',
+            'platform' => 'nullable|string|max:50',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        $user = $request->user();
+        $search = trim((string) ($validated['search'] ?? ''));
+        $platform = trim((string) ($validated['platform'] ?? ''));
+        $perPage = max(1, min((int) ($validated['per_page'] ?? 10), 100));
 
         $conversations = Conversation::with('lead.leadStatus')
             ->where('assigned_user_id', $user->id)
+            ->when($platform !== '' && $platform !== 'all', function ($query) use ($platform) {
+                $query->where('platform', $platform);
+            })
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder
+                        ->where('platform', 'like', '%' . $search . '%')
+                        ->orWhereHas('lead', function ($leadQuery) use ($search) {
+                            $leadQuery
+                                ->where('name', 'like', '%' . $search . '%')
+                                ->orWhere('arabic_name', 'like', '%' . $search . '%')
+                                ->orWhere('profile_name', 'like', '%' . $search . '%')
+                                ->orWhere('phone', 'like', '%' . $search . '%');
+                        });
+                });
+            })
             ->orderBy('last_message_time', 'desc')
-            ->get();
+            ->orderByDesc('id')
+            ->paginate($perPage)
+            ->withQueryString();
 
         return response()->json($conversations);
     }

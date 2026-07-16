@@ -13,6 +13,13 @@ class IndexLeadRequest extends FormRequest
 
     public function rules(): array
     {
-        return [];
+        return [
+            'search' => 'nullable|string|max:255',
+            'status' => 'nullable|string|max:255',
+            'assignment_status' => 'nullable|in:assigned,unassigned',
+            'clinic_assignment_status' => 'nullable|in:assigned,unassigned',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ];
     }
 }
