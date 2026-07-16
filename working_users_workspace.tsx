@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import { WorkflowInput } from "@/components/workflow-input";
 import { StatCard } from "@/components/stat-card";
+import { PaginationControls } from "@/components/pagination-controls";
 
 type UserForm = {
   name: string;
@@ -44,6 +45,7 @@ const initialForm: UserForm = {
 };
 
 const PROTECTED_ADMIN_EMAIL = "super@clinic.com";
+const USERS_PAGE_SIZE = 10;
 
 function toForm(user?: User | null): UserForm {
   if (!user) {
@@ -124,6 +126,7 @@ export function UsersWorkspace() {
   const [notice, setNotice] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
+  const [userPage, setUserPage] = useState(1);
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -139,6 +142,12 @@ export function UsersWorkspace() {
         .some((value) => String(value).toLowerCase().includes(term));
     });
   }, [search, users]);
+
+  const userTotalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PAGE_SIZE));
+  const paginatedUsers = useMemo(
+    () => filteredUsers.slice((userPage - 1) * USERS_PAGE_SIZE, userPage * USERS_PAGE_SIZE),
+    [filteredUsers, userPage],
+  );
 
   const selectedUser = useMemo(() => users.find((user) => user.id === selectedId) ?? null, [selectedId, users]);
 
@@ -181,6 +190,16 @@ export function UsersWorkspace() {
   useEffect(() => {
     setEditForm(toForm(selectedUser));
   }, [selectedUser]);
+
+  useEffect(() => {
+    setUserPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    if (userPage > userTotalPages) {
+      setUserPage(userTotalPages);
+    }
+  }, [userPage, userTotalPages]);
 
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -347,7 +366,7 @@ export function UsersWorkspace() {
             <div className="text-sm text-slate-500">Loading users...</div>
           ) : (
             <div className="space-y-3">
-              {filteredUsers.map((user) => {
+              {paginatedUsers.map((user) => {
                 const active = selectedUser?.id === user.id;
                 return (
                   <button
@@ -381,6 +400,7 @@ export function UsersWorkspace() {
                   </button>
                 );
               })}
+              <PaginationControls page={userPage} totalPages={userTotalPages} totalItems={filteredUsers.length} pageSize={USERS_PAGE_SIZE} itemLabel="users" onPageChange={setUserPage} />
             </div>
           )}
         </Panel>

@@ -10,6 +10,7 @@ import { WorkflowInput } from "@/components/workflow-input";
 import { WorkflowSelect } from "@/components/workflow-select";
 import { WorkflowTextarea } from "@/components/workflow-textarea";
 import { StatCard } from "@/components/stat-card";
+import { PaginationControls } from "@/components/pagination-controls";
 
 type CampaignForm = {
   name: string;
@@ -46,6 +47,8 @@ const statusOptions = [
   { label: "Active", value: "active" },
   { label: "Paused", value: "paused" },
 ];
+const CAMPAIGNS_PAGE_SIZE = 10;
+const META_CAMPAIGNS_PAGE_SIZE = 8;
 
 function toDateInput(value?: string | null) {
   return value ? value.slice(0, 10) : "";
@@ -110,6 +113,10 @@ export function CampaignsWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
+  const [campaignPage, setCampaignPage] = useState(1);
+  const [metaCampaignPage, setMetaCampaignPage] = useState(1);
 
   const filteredCampaigns = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -134,6 +141,12 @@ export function CampaignsWorkspace() {
         .some((value) => String(value).toLowerCase().includes(term));
     });
   }, [campaigns, search]);
+
+  const campaignTotalPages = Math.max(1, Math.ceil(filteredCampaigns.length / CAMPAIGNS_PAGE_SIZE));
+  const paginatedCampaigns = useMemo(
+    () => filteredCampaigns.slice((campaignPage - 1) * CAMPAIGNS_PAGE_SIZE, campaignPage * CAMPAIGNS_PAGE_SIZE),
+    [campaignPage, filteredCampaigns],
+  );
 
   const selectedCampaign = useMemo(
     () => campaigns.find((campaign) => campaign.id === selectedId) ?? null,
@@ -163,6 +176,12 @@ export function CampaignsWorkspace() {
         .some((value) => String(value).toLowerCase().includes(term));
     });
   }, [availableMetaCampaigns, metaSearch]);
+
+  const metaCampaignTotalPages = Math.max(1, Math.ceil(filteredMetaCampaigns.length / META_CAMPAIGNS_PAGE_SIZE));
+  const paginatedMetaCampaigns = useMemo(
+    () => filteredMetaCampaigns.slice((metaCampaignPage - 1) * META_CAMPAIGNS_PAGE_SIZE, metaCampaignPage * META_CAMPAIGNS_PAGE_SIZE),
+    [filteredMetaCampaigns, metaCampaignPage],
+  );
 
   const stats = useMemo(
     () => ({
@@ -225,8 +244,30 @@ export function CampaignsWorkspace() {
     setEditForm(toForm(selectedCampaign));
   }, [selectedCampaign]);
 
+  useEffect(() => {
+    setCampaignPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    setMetaCampaignPage(1);
+  }, [metaSearch]);
+
+  useEffect(() => {
+    if (campaignPage > campaignTotalPages) {
+      setCampaignPage(campaignTotalPages);
+    }
+  }, [campaignPage, campaignTotalPages]);
+
+  useEffect(() => {
+    if (metaCampaignPage > metaCampaignTotalPages) {
+      setMetaCampaignPage(metaCampaignTotalPages);
+    }
+  }, [metaCampaignPage, metaCampaignTotalPages]);
+
   function openCampaign(id: string | number) {
     setSelectedId(id);
+    setDetailsError(null);
+    setDetailsNotice(null);
     setDetailsOpen(true);
   }
 
@@ -261,13 +302,15 @@ export function CampaignsWorkspace() {
     setSavingEdit(true);
     setError(null);
     setNotice(null);
+    setDetailsError(null);
+    setDetailsNotice(null);
 
     try {
       await mutateJson(`/campaigns/${selectedCampaign.id}`, "PATCH", buildPayload(editForm));
-      setNotice(`Campaign "${editForm.name}" updated successfully.`);
+      setDetailsNotice(`Campaign "${editForm.name}" updated successfully.`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update campaign.");
+      setDetailsError(err instanceof Error ? err.message : "Unable to update campaign.");
     } finally {
       setSavingEdit(false);
     }
@@ -277,17 +320,19 @@ export function CampaignsWorkspace() {
     setDeletingId(id);
     setError(null);
     setNotice(null);
+    setDetailsError(null);
+    setDetailsNotice(null);
 
     try {
       await removeResource(`/campaigns/${id}`);
-      setNotice(`Campaign #${id} deleted successfully.`);
+      setDetailsNotice(`Campaign #${id} deleted successfully.`);
       if (selectedId === id) {
         setSelectedId(null);
         setDetailsOpen(false);
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to delete campaign.");
+      setDetailsError(err instanceof Error ? err.message : "Unable to delete campaign.");
     } finally {
       setDeletingId(null);
     }
@@ -357,7 +402,7 @@ export function CampaignsWorkspace() {
             <div className="text-sm text-slate-500">Loading campaigns...</div>
           ) : (
             <div className="space-y-3">
-              {filteredCampaigns.map((campaign) => (
+              {paginatedCampaigns.map((campaign) => (
                 <button
                   key={campaign.id}
                   type="button"
@@ -377,6 +422,7 @@ export function CampaignsWorkspace() {
                   </div>
                 </button>
               ))}
+              <PaginationControls page={campaignPage} totalPages={campaignTotalPages} totalItems={filteredCampaigns.length} pageSize={CAMPAIGNS_PAGE_SIZE} itemLabel="campaigns" onPageChange={setCampaignPage} />
             </div>
           )}
         </Panel>
@@ -419,7 +465,7 @@ export function CampaignsWorkspace() {
                 <div className="text-sm text-slate-500">Loading campaigns from the selected Meta ad account...</div>
               ) : filteredMetaCampaigns.length > 0 ? (
                 <div className="space-y-3">
-                  {filteredMetaCampaigns.map((campaign) => {
+                  {paginatedMetaCampaigns.map((campaign) => {
                     const selected = selectedMetaCampaignIds.includes(campaign.id);
 
                     return (
@@ -463,6 +509,7 @@ export function CampaignsWorkspace() {
                       </label>
                     );
                   })}
+                  <PaginationControls page={metaCampaignPage} totalPages={metaCampaignTotalPages} totalItems={filteredMetaCampaigns.length} pageSize={META_CAMPAIGNS_PAGE_SIZE} itemLabel="meta campaigns" onPageChange={setMetaCampaignPage} />
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
@@ -510,6 +557,8 @@ export function CampaignsWorkspace() {
             </div>
 
             <div className="max-h-[calc(90vh-76px)] overflow-y-auto px-5 py-5">
+              {detailsError ? <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{detailsError}</div> : null}
+              {detailsNotice ? <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">{detailsNotice}</div> : null}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <StatCard label="Status" value={selectedCampaign.status || "Draft"} hint="Current operating status." />
                 <StatCard label="Budget" value={selectedCampaign.budget != null ? `${selectedCampaign.budget}` : "0"} hint={selectedCampaign.currency || "No currency"} />

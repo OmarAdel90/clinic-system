@@ -9,6 +9,7 @@ import { WorkflowInput } from "@/components/workflow-input";
 import { WorkflowSelect } from "@/components/workflow-select";
 import { WorkflowTextarea } from "@/components/workflow-textarea";
 import { StatCard } from "@/components/stat-card";
+import { PaginationControls } from "@/components/pagination-controls";
 
 type ServiceRow = {
   name: string;
@@ -38,6 +39,10 @@ const initialForm: ClinicForm = {
   doctors: [],
   warehouse_id: "",
 };
+
+const CLINICS_PAGE_SIZE = 10;
+const CLINIC_PHONE_PATTERN = /^\+?[0-9][0-9\s\-()]{6,19}$/;
+const CLINIC_NAME_PATTERN = /^(?=.*[A-Za-z0-9])[A-Za-z0-9&().,'/\-\s]+$/;
 
 function toList(value: string) {
   return value
@@ -124,6 +129,25 @@ function buildClinicPayload(form: ClinicForm, includeWarehouse: boolean) {
   return payload;
 }
 
+function validateClinicForm(form: ClinicForm) {
+  const name = form.name.trim();
+  const phone = form.phone_number.trim();
+
+  if (name.length < 2) {
+    return "Clinic name must be at least 2 characters.";
+  }
+
+  if (!CLINIC_NAME_PATTERN.test(name)) {
+    return "Clinic name may only contain letters, numbers, spaces, and basic punctuation.";
+  }
+
+  if (!CLINIC_PHONE_PATTERN.test(phone)) {
+    return "Phone number must contain only digits and standard phone symbols.";
+  }
+
+  return null;
+}
+
 export function ClinicsWorkspace() {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -141,6 +165,7 @@ export function ClinicsWorkspace() {
   const [notice, setNotice] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
+  const [clinicPage, setClinicPage] = useState(1);
 
   const filteredClinics = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -165,6 +190,11 @@ export function ClinicsWorkspace() {
   }, [clinics, search]);
 
   const selectedClinic = useMemo(() => clinics.find((clinic) => clinic.id === selectedId) ?? null, [clinics, selectedId]);
+  const clinicTotalPages = Math.max(1, Math.ceil(filteredClinics.length / CLINICS_PAGE_SIZE));
+  const paginatedClinics = useMemo(() => {
+    const start = (clinicPage - 1) * CLINICS_PAGE_SIZE;
+    return filteredClinics.slice(start, start + CLINICS_PAGE_SIZE);
+  }, [clinicPage, filteredClinics]);
 
   const doctorOptions = useMemo(
     () => users.map((user) => ({ id: user.id, label: user.name || user.email })),
@@ -221,6 +251,16 @@ export function ClinicsWorkspace() {
   }, [selectedClinic]);
 
   useEffect(() => {
+    setClinicPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    if (clinicPage > clinicTotalPages) {
+      setClinicPage(clinicTotalPages);
+    }
+  }, [clinicPage, clinicTotalPages]);
+
+  useEffect(() => {
     if (!createForm.provides_medication && createForm.warehouse_id) {
       setCreateForm((current) => ({ ...current, warehouse_id: "" }));
     }
@@ -234,6 +274,13 @@ export function ClinicsWorkspace() {
 
   async function createClinic(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const validationError = validateClinicForm(createForm);
+    if (validationError) {
+      setError(validationError);
+      setNotice(null);
+      return;
+    }
+
     setSavingCreate(true);
     setError(null);
     setNotice(null);
@@ -253,6 +300,13 @@ export function ClinicsWorkspace() {
   async function updateClinic(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedClinic) {
+      return;
+    }
+
+    const validationError = validateClinicForm(editForm);
+    if (validationError) {
+      setDetailsError(validationError);
+      setDetailsNotice(null);
       return;
     }
 
@@ -421,7 +475,7 @@ export function ClinicsWorkspace() {
             <div className="text-sm text-slate-500">Loading clinics...</div>
           ) : (
             <div className="space-y-3">
-              {filteredClinics.map((clinic) => {
+              {paginatedClinics.map((clinic) => {
                 const active = selectedClinic?.id === clinic.id;
                 return (
                   <button
@@ -454,6 +508,14 @@ export function ClinicsWorkspace() {
                   </button>
                 );
               })}
+              <PaginationControls
+                page={clinicPage}
+                totalPages={clinicTotalPages}
+                totalItems={filteredClinics.length}
+                pageSize={CLINICS_PAGE_SIZE}
+                itemLabel="clinics"
+                onPageChange={setClinicPage}
+              />
             </div>
           )}
         </Panel>
@@ -462,9 +524,9 @@ export function ClinicsWorkspace() {
           <Panel title="Create Clinic" description="Set up branch details, departments, and available services.">
             <form className="space-y-4" onSubmit={createClinic}>
               <div className="grid gap-4 md:grid-cols-2">
-                <WorkflowInput label="Name" name="create-clinic-name" value={createForm.name} onChange={(value) => setCreateForm((current) => ({ ...current, name: value }))} required />
+                <WorkflowInput label="Name" name="create-clinic-name" value={createForm.name} onChange={(value) => setCreateForm((current) => ({ ...current, name: value }))} placeholder="Clinic name" required />
                 <WorkflowInput label="Arabic Name" name="create-clinic-arabic-name" value={createForm.arabic_name} onChange={(value) => setCreateForm((current) => ({ ...current, arabic_name: value }))} required />
-                <WorkflowInput label="Phone" name="create-clinic-phone" value={createForm.phone_number} onChange={(value) => setCreateForm((current) => ({ ...current, phone_number: value }))} required />
+                <WorkflowInput label="Phone" name="create-clinic-phone" value={createForm.phone_number} onChange={(value) => setCreateForm((current) => ({ ...current, phone_number: value }))} placeholder="+20 10..." required />
                 <WorkflowSelect label="Medication Support" value={createForm.provides_medication ? "true" : "false"} onChange={(value) => setCreateForm((current) => ({ ...current, provides_medication: value === "true" }))} options={[{ label: "Provides medication", value: "true" }, { label: "Services only", value: "false" }]} required />
               </div>
               <WorkflowTextarea label="Address" value={createForm.address} onChange={(value) => setCreateForm((current) => ({ ...current, address: value }))} placeholder="Street, district, and any branch notes" />
@@ -513,9 +575,9 @@ export function ClinicsWorkspace() {
                 <Panel title="Clinic Details" description="Adjust branch details, staffing, and warehouse linkage without leaving the list view.">
                   <form className="space-y-4" onSubmit={updateClinic}>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <WorkflowInput label="Name" name="edit-clinic-name" value={editForm.name} onChange={(value) => setEditForm((current) => ({ ...current, name: value }))} required />
+                      <WorkflowInput label="Name" name="edit-clinic-name" value={editForm.name} onChange={(value) => setEditForm((current) => ({ ...current, name: value }))} placeholder="Clinic name" required />
                       <WorkflowInput label="Arabic Name" name="edit-clinic-arabic-name" value={editForm.arabic_name} onChange={(value) => setEditForm((current) => ({ ...current, arabic_name: value }))} required />
-                      <WorkflowInput label="Phone" name="edit-clinic-phone" value={editForm.phone_number} onChange={(value) => setEditForm((current) => ({ ...current, phone_number: value }))} required />
+                      <WorkflowInput label="Phone" name="edit-clinic-phone" value={editForm.phone_number} onChange={(value) => setEditForm((current) => ({ ...current, phone_number: value }))} placeholder="+20 10..." required />
                       <WorkflowSelect label="Medication Support" value={editForm.provides_medication ? "true" : "false"} onChange={(value) => setEditForm((current) => ({ ...current, provides_medication: value === "true" }))} options={[{ label: "Provides medication", value: "true" }, { label: "Services only", value: "false" }]} required />
                       <WorkflowSelect label="Warehouse" value={editForm.warehouse_id} onChange={(value) => setEditForm((current) => ({ ...current, warehouse_id: value }))} options={availableWarehouses.map((warehouse) => ({ label: warehouse.name, value: String(warehouse.id) }))} emptyLabel="No warehouse" />
                     </div>

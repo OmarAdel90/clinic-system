@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { WorkflowInput } from "@/components/workflow-input";
 import { WorkflowSelect } from "@/components/workflow-select";
 import { StatCard } from "@/components/stat-card";
+import { PaginationControls } from "@/components/pagination-controls";
 
 type LeadForm = {
   campaign_id: string;
@@ -31,6 +32,7 @@ const initialForm: LeadForm = {
 
 type LeadDetailsView = "overview" | "conversations" | "actions";
 const NEXT_QUEUE_OPTION = "__next_queue__";
+const LEADS_PAGE_SIZE = 10;
 
 function getLeadDisplayName(lead?: Lead | (Lead & { arabic_name?: string | null }) | null) {
   if (!lead) return "Unknown lead";
@@ -74,6 +76,7 @@ export function LeadsWorkspaceV2() {
   const [createNotice, setCreateNotice] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
+  const [leadPage, setLeadPage] = useState(1);
 
   const filteredLeads = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -99,6 +102,12 @@ export function LeadsWorkspaceV2() {
       return matchesSearch && matchesStatus && matchesAssignmentStatus && matchesClinicAssignedStatus;
     });
   }, [assignmentStatusFilter, clinicAssignedStatusFilter, leads, search, statusFilter]);
+
+  const leadTotalPages = Math.max(1, Math.ceil(filteredLeads.length / LEADS_PAGE_SIZE));
+  const paginatedLeads = useMemo(
+    () => filteredLeads.slice((leadPage - 1) * LEADS_PAGE_SIZE, leadPage * LEADS_PAGE_SIZE),
+    [filteredLeads, leadPage],
+  );
 
   const selectedLead = useMemo(
     () => filteredLeads.find((lead) => lead.id === selectedLeadId) ?? leads.find((lead) => lead.id === selectedLeadId) ?? filteredLeads[0] ?? leads[0] ?? null,
@@ -190,6 +199,16 @@ export function LeadsWorkspaceV2() {
       setDetailsOpen(true);
     }
   }, [leadFromQuery, selectedLeadId]);
+
+  useEffect(() => {
+    setLeadPage(1);
+  }, [search, statusFilter, assignmentStatusFilter, clinicAssignedStatusFilter]);
+
+  useEffect(() => {
+    if (leadPage > leadTotalPages) {
+      setLeadPage(leadTotalPages);
+    }
+  }, [leadPage, leadTotalPages]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -377,7 +396,7 @@ export function LeadsWorkspaceV2() {
 
         {!loading ? (
           <div className="space-y-3">
-            {filteredLeads.map((lead) => {
+            {paginatedLeads.map((lead) => {
               const assignedUserName =
                 lead.assignment_state?.user?.name ||
                 users.find((user) => user.id === lead.assignment_state?.user_id)?.name;
@@ -418,6 +437,7 @@ export function LeadsWorkspaceV2() {
               );
             })}
             {filteredLeads.length === 0 ? <div className="text-sm text-slate-500">No leads match the current filters.</div> : null}
+            <PaginationControls page={leadPage} totalPages={leadTotalPages} totalItems={filteredLeads.length} pageSize={LEADS_PAGE_SIZE} itemLabel="leads" onPageChange={setLeadPage} />
           </div>
         ) : null}
       </Panel>

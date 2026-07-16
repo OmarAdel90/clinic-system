@@ -14,9 +14,9 @@ class StoreClinicRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'                => 'required|string|max:255|unique:clinics,name',
+            'name'                => ['required', 'string', 'min:2', 'max:255', 'unique:clinics,name', 'regex:/^(?=.*[A-Za-z0-9])[A-Za-z0-9&().,\'\/\-\s]+$/'],
             'arabic_name'         => ['required', 'string', 'max:255', 'unique:clinics,arabic_name', 'regex:/^(?=.*\p{Arabic})[\p{Arabic}\s\-\d]+$/u'],
-            'phone_number'        => 'required|string|max:50',
+            'phone_number'        => ['required', 'string', 'max:20', 'regex:/^\+?[0-9][0-9\s\-\(\)]{6,19}$/'],
             'address'             => 'required|string|max:500',
             'provides_medication' => 'required|boolean',
             'departments'         => 'required|array',
@@ -51,6 +51,14 @@ class StoreClinicRequest extends FormRequest
             ],
             'doctors'             => 'nullable|array',
             'doctors.*'           => 'integer|max:255|exists:users,id',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.regex' => 'Clinic name may only contain letters, numbers, spaces, and basic punctuation.',
+            'phone_number.regex' => 'Phone number must contain only digits and standard phone symbols.',
         ];
     }
 }

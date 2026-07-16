@@ -16,9 +16,9 @@ class UpdateClinicRequest extends FormRequest
         $clinicId = $this->route('clinic')?->id ?? $this->route('clinic');
 
         return [
-            'name'                => 'sometimes|required|string|max:255|unique:clinics,name,' . $clinicId,
+            'name'                => ['sometimes', 'required', 'string', 'min:2', 'max:255', 'unique:clinics,name,' . $clinicId, 'regex:/^(?=.*[A-Za-z0-9])[A-Za-z0-9&().,\'\/\-\s]+$/'],
             'arabic_name'         => ['sometimes', 'required', 'string', 'max:255', 'unique:clinics,arabic_name,' . $clinicId, 'regex:/^(?=.*\p{Arabic})[\p{Arabic}\s\-\d]+$/u'],
-            'phone_number'        => 'sometimes|string|max:50',
+            'phone_number'        => ['sometimes', 'required', 'string', 'max:20', 'regex:/^\+?[0-9][0-9\s\-\(\)]{6,19}$/'],
             'address'             => 'sometimes|string|max:500',
             'provides_medication' => 'sometimes|boolean',
             'departments'         => 'sometimes|array',
@@ -55,6 +55,14 @@ class UpdateClinicRequest extends FormRequest
                 },
             ],
             'warehouse_id'        => 'sometimes|nullable|exists:warehouses,id'
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.regex' => 'Clinic name may only contain letters, numbers, spaces, and basic punctuation.',
+            'phone_number.regex' => 'Phone number must contain only digits and standard phone symbols.',
         ];
     }
 }

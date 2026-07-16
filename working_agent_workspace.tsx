@@ -19,6 +19,7 @@ import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
 import { WorkflowInput } from "@/components/workflow-input";
 import { WorkflowSelect } from "@/components/workflow-select";
+import { PaginationControls } from "@/components/pagination-controls";
 
 function getConversationTitle(conversation: Conversation) {
   const arabicName = (conversation.lead as (Conversation["lead"] & { arabic_name?: string | null }) | null | undefined)?.arabic_name;
@@ -35,6 +36,15 @@ function getMessagePreview(rows: MessageRecord[]) {
   return latest?.body || latest?.media_caption || latest?.type || "No messages loaded yet.";
 }
 
+function getMediaFileName(message: MessageRecord) {
+  if (!message.media_url) {
+    return "attachment";
+  }
+
+  const lastSegment = message.media_url.split("/").pop() || "attachment";
+  return lastSegment.split("?")[0] || "attachment";
+}
+
 function renderMessageMedia(message: MessageRecord) {
   if (!message.media_url) {
     return null;
@@ -42,44 +52,75 @@ function renderMessageMedia(message: MessageRecord) {
 
   const type = (message.type || "").toLowerCase();
   const sharedClassName = "mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/5";
+  const actions = (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <a
+        href={message.media_url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center rounded-lg border border-current/20 px-3 py-1.5 text-xs font-medium underline-offset-2 hover:underline"
+      >
+        Open
+      </a>
+      <a
+        href={message.media_url}
+        download={getMediaFileName(message)}
+        className="inline-flex items-center rounded-lg border border-current/20 px-3 py-1.5 text-xs font-medium underline-offset-2 hover:underline"
+      >
+        Save
+      </a>
+    </div>
+  );
 
   if (type === "image") {
-    return <img src={message.media_url} alt={message.media_caption || "Image attachment"} className={`${sharedClassName} max-h-80 w-full object-cover`} />;
+    return (
+      <>
+        <img src={message.media_url} alt={message.media_caption || "Image attachment"} className={`${sharedClassName} max-h-80 w-full object-cover`} />
+        {actions}
+      </>
+    );
   }
 
   if (type === "audio" || (message.media_mime || "").startsWith("audio/")) {
     return (
-      <div className={sharedClassName}>
-        <audio controls preload="metadata" className="w-full">
-          <source src={message.media_url} type={message.media_mime || undefined} />
-        </audio>
-      </div>
+      <>
+        <div className={sharedClassName}>
+          <audio controls preload="metadata" className="w-full">
+            <source src={message.media_url} type={message.media_mime || undefined} />
+          </audio>
+        </div>
+        {actions}
+      </>
     );
   }
 
   if (type === "video" || (message.media_mime || "").startsWith("video/")) {
     return (
-      <div className={sharedClassName}>
-        <video controls preload="metadata" className="max-h-80 w-full bg-black">
-          <source src={message.media_url} type={message.media_mime || undefined} />
-        </video>
-      </div>
+      <>
+        <div className={sharedClassName}>
+          <video controls preload="metadata" className="max-h-80 w-full bg-black">
+            <source src={message.media_url} type={message.media_mime || undefined} />
+          </video>
+        </div>
+        {actions}
+      </>
     );
   }
 
   return (
-    <a
-      href={message.media_url}
-      target="_blank"
-      rel="noreferrer"
-      className="mt-3 inline-flex items-center rounded-xl border border-current/20 px-3 py-2 text-xs font-medium underline-offset-2 hover:underline"
-    >
-      Open attachment
-    </a>
+    <>
+      <div className="mt-3 rounded-xl border border-current/20 px-3 py-2 text-xs font-medium">
+        {getMediaFileName(message)}
+      </div>
+      {actions}
+    </>
   );
 }
 
 type AttachmentKind = "image" | "video" | "file";
+
+const FOLLOWUPS_PAGE_SIZE = 9;
+const CONVERSATIONS_PAGE_SIZE = 10;
 
 const ATTACHMENT_ACCEPT: Record<AttachmentKind, string> = {
   image: "image/*",
@@ -229,6 +270,8 @@ export function AgentWorkspace() {
   const [notice, setNotice] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
+  const [followupPage, setFollowupPage] = useState(1);
+  const [conversationPage, setConversationPage] = useState(1);
   const threadViewportRef = useRef<HTMLDivElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -277,6 +320,16 @@ export function AgentWorkspace() {
       return matchesSearch && matchesPlatform;
     });
   }, [conversationPlatform, conversationSearch, conversations, messages]);
+  const followupTotalPages = Math.max(1, Math.ceil(filteredFollowups.length / FOLLOWUPS_PAGE_SIZE));
+  const paginatedFollowups = useMemo(() => {
+    const start = (followupPage - 1) * FOLLOWUPS_PAGE_SIZE;
+    return filteredFollowups.slice(start, start + FOLLOWUPS_PAGE_SIZE);
+  }, [filteredFollowups, followupPage]);
+  const conversationTotalPages = Math.max(1, Math.ceil(filteredConversations.length / CONVERSATIONS_PAGE_SIZE));
+  const paginatedConversations = useMemo(() => {
+    const start = (conversationPage - 1) * CONVERSATIONS_PAGE_SIZE;
+    return filteredConversations.slice(start, start + CONVERSATIONS_PAGE_SIZE);
+  }, [conversationPage, filteredConversations]);
 
   const selectedConversation = useMemo(
     () => filteredConversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations.find((conversation) => conversation.id === selectedConversationId) ?? filteredConversations[0] ?? conversations[0] ?? null,
@@ -339,6 +392,26 @@ export function AgentWorkspace() {
 
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    setFollowupPage(1);
+  }, [followupSearch, followupTiming]);
+
+  useEffect(() => {
+    setConversationPage(1);
+  }, [conversationSearch, conversationPlatform]);
+
+  useEffect(() => {
+    if (followupPage > followupTotalPages) {
+      setFollowupPage(followupTotalPages);
+    }
+  }, [followupPage, followupTotalPages]);
+
+  useEffect(() => {
+    if (conversationPage > conversationTotalPages) {
+      setConversationPage(conversationTotalPages);
+    }
+  }, [conversationPage, conversationTotalPages]);
 
   useEffect(() => {
     if (!selectedConversation || !detailsOpen) {
@@ -663,7 +736,7 @@ export function AgentWorkspace() {
         </div>
 
         <div className="grid gap-3 xl:grid-cols-3">
-            {filteredFollowups.map((followup) => (
+            {paginatedFollowups.map((followup) => (
               <div key={followup.id} className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -697,6 +770,7 @@ export function AgentWorkspace() {
               </div>
             ))}
           {filteredFollowups.length === 0 ? <div className="text-sm text-slate-500">No pending follow-ups match the current filters.</div> : null}
+          <PaginationControls page={followupPage} totalPages={followupTotalPages} totalItems={filteredFollowups.length} pageSize={FOLLOWUPS_PAGE_SIZE} itemLabel="follow-ups" onPageChange={setFollowupPage} />
         </div>
       </Panel>
 
@@ -715,7 +789,7 @@ export function AgentWorkspace() {
                 </div>
 
                 <div className="space-y-3">
-                  {filteredConversations.map((conversation) => {
+                  {paginatedConversations.map((conversation) => {
                     const active = selectedConversation?.id === conversation.id;
                     const preview = getMessagePreview(messages[conversation.id] ?? []);
                     const unread = conversation.unread_amount ?? 0;
@@ -751,6 +825,7 @@ export function AgentWorkspace() {
                     );
                   })}
                   {filteredConversations.length === 0 ? <div className="text-sm text-slate-500">No assigned conversations match the current filters.</div> : null}
+                  <PaginationControls page={conversationPage} totalPages={conversationTotalPages} totalItems={filteredConversations.length} pageSize={CONVERSATIONS_PAGE_SIZE} itemLabel="conversations" onPageChange={setConversationPage} />
                 </div>
           </div>
         </div>
