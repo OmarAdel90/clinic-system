@@ -16,6 +16,7 @@ class StoreCampaignRequest extends FormRequest
         return [
             'name'        => 'required|string|max:255',
             'ad_account_id' => 'nullable|string|max:100',
+            'ad_account_name' => 'nullable|string|max:255',
             'platform'    => 'required|string|max:255',
             'description' => 'nullable|string',
             'start_date'  => 'nullable|date',
@@ -25,6 +26,15 @@ class StoreCampaignRequest extends FormRequest
             'status'      => 'nullable|in:draft,active,paused',
             'objective'   => 'nullable|string|max:255',
             'meta_source' => 'nullable|string|max:50',
+            'spend'       => 'nullable|numeric|min:0',
+            'impressions' => 'nullable|integer|min:0',
+            'clicks'      => 'nullable|integer|min:0',
+            'ctr'         => 'nullable|numeric|min:0',
+            'cpc'         => 'nullable|numeric|min:0',
+            'results'     => 'nullable|numeric|min:0',
+            'result_label' => 'nullable|string|max:255',
+            'ad_sets'     => 'nullable|array',
+            'metrics_synced_at' => 'nullable|date',
         ];
     }
 }

@@ -28,7 +28,7 @@ class MetaAdsService
         $version = $apiVersion ?: $this->apiVersion();
         $normalizedId = $this->normalizeAdAccountId($adAccountId);
 
-        return $this->collectPaginated(
+        $campaigns = $this->collectPaginated(
             "https://graph.facebook.com/{$version}/act_{$normalizedId}/campaigns",
             $token,
             [
@@ -36,6 +36,15 @@ class MetaAdsService
                 'limit' => 200,
             ],
         );
+
+        return array_map(function (array $campaign) use ($token, $version) {
+            $campaignId = (string) ($campaign['id'] ?? '');
+
+            return array_merge($campaign, [
+                'insights' => $campaignId !== '' ? $this->campaignInsights($campaignId, $token, $version) : [],
+                'adsets' => $campaignId !== '' ? $this->campaignAdSets($campaignId, $token, $version) : [],
+            ]);
+        }, $campaigns);
     }
 
     protected function collectPaginated(string $url, string $token, array $query): array
@@ -58,6 +67,35 @@ class MetaAdsService
         }
 
         return $results;
+    }
+
+    protected function campaignInsights(string $campaignId, string $token, string $version): array
+    {
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->get("https://graph.facebook.com/{$version}/{$campaignId}/insights", [
+                'fields' => 'spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type',
+                'date_preset' => 'maximum',
+                'limit' => 1,
+            ]);
+
+        if ($response->failed()) {
+            return [];
+        }
+
+        return $response->json('data.0', []) ?: [];
+    }
+
+    protected function campaignAdSets(string $campaignId, string $token, string $version): array
+    {
+        return $this->collectPaginated(
+            "https://graph.facebook.com/{$version}/{$campaignId}/adsets",
+            $token,
+            [
+                'fields' => 'id,name,status,optimization_goal,daily_budget,lifetime_budget',
+                'limit' => 200,
+            ],
+        );
     }
 
     protected function resolveAccessToken(?string $token = null): string

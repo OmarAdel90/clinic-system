@@ -87,10 +87,19 @@ export type MetaAdAccount = {
   account_status?: string | number | null;
 };
 
+export type MetaCampaignAdSet = {
+  id: string;
+  name: string;
+  status?: string | null;
+  optimization_goal?: string | null;
+  budget?: number | null;
+};
+
 export type MetaAvailableCampaign = {
   id: string;
   name: string;
   ad_account_id?: string | null;
+  ad_account_name?: string | null;
   platform?: string | null;
   status?: string | null;
   objective?: string | null;
@@ -98,6 +107,14 @@ export type MetaAvailableCampaign = {
   end_date?: string | null;
   budget?: number | null;
   currency?: string | null;
+  spend?: number | null;
+  impressions?: number | null;
+  clicks?: number | null;
+  ctr?: number | null;
+  cpc?: number | null;
+  results?: number | null;
+  result_label?: string | null;
+  ad_sets?: MetaCampaignAdSet[] | null;
   imported?: boolean;
 };
 
@@ -244,6 +261,7 @@ export type Campaign = {
   id: string | number;
   name: string;
   ad_account_id?: string | null;
+  ad_account_name?: string | null;
   platform?: string | null;
   description?: string | null;
   start_date?: string | null;
@@ -253,6 +271,15 @@ export type Campaign = {
   status?: string | null;
   objective?: string | null;
   meta_source?: string | null;
+  spend?: number | null;
+  impressions?: number | null;
+  clicks?: number | null;
+  ctr?: number | null;
+  cpc?: number | null;
+  results?: number | null;
+  result_label?: string | null;
+  ad_sets?: MetaCampaignAdSet[] | null;
+  metrics_synced_at?: string | null;
 };
 
 export type LeadStatus = {

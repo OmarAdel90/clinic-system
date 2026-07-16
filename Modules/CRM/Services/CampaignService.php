@@ -95,14 +95,39 @@ class CampaignService
 
         $existingIds = Campaign::query()->pluck('id')->map(fn ($id) => (string) $id)->all();
 
+        $accountLookup = collect($this->metaAdsService->listAdAccounts($adsToken))
+            ->mapWithKeys(function (array $account) {
+                $id = preg_replace('/^act_/i', '', (string) ($account['account_id'] ?? $account['id'] ?? ''));
+
+                return $id !== '' ? [$id => ($account['name'] ?? ('Ad Account ' . $id))] : [];
+            });
+
         return collect($this->metaAdsService->listCampaigns($adAccountId))
-            ->map(function (array $campaign) use ($adAccountId, $existingIds) {
+            ->map(function (array $campaign) use ($adAccountId, $existingIds, $accountLookup) {
                 $budget = $campaign['daily_budget'] ?? $campaign['lifetime_budget'] ?? null;
+                $insights = $campaign['insights'] ?? [];
+                $resultMetrics = $this->resolveResultMetrics(
+                    $insights['actions'] ?? [],
+                    $insights['cost_per_action_type'] ?? [],
+                );
+                $adSets = collect($campaign['adsets'] ?? [])->map(function (array $adSet) {
+                    $budget = $adSet['daily_budget'] ?? $adSet['lifetime_budget'] ?? null;
+
+                    return [
+                        'id' => (string) ($adSet['id'] ?? ''),
+                        'name' => $adSet['name'] ?? 'Unnamed ad set',
+                        'status' => isset($adSet['status']) ? strtolower((string) $adSet['status']) : null,
+                        'optimization_goal' => $adSet['optimization_goal'] ?? null,
+                        'budget' => $budget !== null ? ((float) $budget) / 100 : null,
+                    ];
+                })->filter(fn (array $adSet) => filled($adSet['id']))->values()->all();
+                $normalizedAccountId = preg_replace('/^act_/i', '', $adAccountId);
 
                 return [
                     'id' => (string) ($campaign['id'] ?? ''),
                     'name' => $campaign['name'] ?? 'Unnamed campaign',
-                    'ad_account_id' => preg_replace('/^act_/i', '', $adAccountId),
+                    'ad_account_id' => $normalizedAccountId,
+                    'ad_account_name' => $accountLookup->get($normalizedAccountId),
                     'platform' => 'meta_ads',
                     'status' => isset($campaign['status']) ? strtolower((string) $campaign['status']) : null,
                     'objective' => $campaign['objective'] ?? null,
@@ -110,6 +135,14 @@ class CampaignService
                     'end_date' => $campaign['stop_time'] ?? null,
                     'budget' => $budget !== null ? ((float) $budget) / 100 : null,
                     'currency' => 'EGP',
+                    'spend' => isset($insights['spend']) ? (float) $insights['spend'] : null,
+                    'impressions' => isset($insights['impressions']) ? (int) $insights['impressions'] : null,
+                    'clicks' => isset($insights['clicks']) ? (int) $insights['clicks'] : null,
+                    'ctr' => isset($insights['ctr']) ? (float) $insights['ctr'] : null,
+                    'cpc' => isset($insights['cpc']) ? (float) $insights['cpc'] : null,
+                    'results' => $resultMetrics['value'],
+                    'result_label' => $resultMetrics['label'],
+                    'ad_sets' => $adSets,
                     'imported' => in_array((string) ($campaign['id'] ?? ''), $existingIds, true),
                 ];
             })
@@ -139,6 +172,7 @@ class CampaignService
                     [
                         'name' => $campaign['name'],
                         'ad_account_id' => $campaign['ad_account_id'],
+                        'ad_account_name' => $campaign['ad_account_name'],
                         'platform' => $campaign['platform'],
                         'description' => null,
                         'start_date' => $campaign['start_date'],
@@ -148,6 +182,15 @@ class CampaignService
                         'status' => in_array($campaign['status'], ['draft', 'active', 'paused'], true) ? $campaign['status'] : 'active',
                         'objective' => $campaign['objective'],
                         'meta_source' => 'meta_ads',
+                        'spend' => $campaign['spend'],
+                        'impressions' => $campaign['impressions'],
+                        'clicks' => $campaign['clicks'],
+                        'ctr' => $campaign['ctr'],
+                        'cpc' => $campaign['cpc'],
+                        'results' => $campaign['results'],
+                        'result_label' => $campaign['result_label'],
+                        'ad_sets' => $campaign['ad_sets'],
+                        'metrics_synced_at' => now(),
                     ]
                 );
             }
@@ -174,5 +217,41 @@ class CampaignService
                     $lead->update(['campaign_id' => (int) $metaCampaignId]);
                 }
             });
+    }
+
+    protected function resolveResultMetrics(array $actions, array $costPerActionTypes): array
+    {
+        $priority = [
+            'lead' => 'Leads',
+            'onsite_conversion.lead_grouped' => 'Leads',
+            'offsite_conversion.fb_pixel_lead' => 'Leads',
+            'onsite_web_lead' => 'Leads',
+            'messaging_conversation_started_7d' => 'Messages Started',
+            'omni_initiated_messaging_conversation' => 'Messages Started',
+            'link_click' => 'Link Clicks',
+            'landing_page_view' => 'Landing Page Views',
+            'purchase' => 'Purchases',
+            'offsite_conversion.fb_pixel_purchase' => 'Purchases',
+            'complete_registration' => 'Registrations',
+            'subscribe' => 'Subscriptions',
+            'post_engagement' => 'Post Engagement',
+        ];
+
+        foreach ($priority as $actionType => $label) {
+            $action = collect($actions)->firstWhere('action_type', $actionType);
+            if ($action && isset($action['value'])) {
+                return [
+                    'label' => $label,
+                    'value' => (float) $action['value'],
+                ];
+            }
+        }
+
+        $first = collect($actions)->first();
+
+        return [
+            'label' => $first['action_type'] ?? null,
+            'value' => isset($first['value']) ? (float) $first['value'] : null,
+        ];
     }
 }

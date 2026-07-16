@@ -13,6 +13,7 @@ class Campaign extends Model
         'id',
         'name',
         'ad_account_id',
+        'ad_account_name',
         'platform',
         'description',
         'start_date',
@@ -22,6 +23,15 @@ class Campaign extends Model
         'status',
         'objective',
         'meta_source',
+        'spend',
+        'impressions',
+        'clicks',
+        'ctr',
+        'cpc',
+        'results',
+        'result_label',
+        'ad_sets',
+        'metrics_synced_at',
     ];
 
     protected $casts = [
@@ -29,6 +39,14 @@ class Campaign extends Model
         'start_date' => 'date',
         'end_date'   => 'date',
         'budget'     => 'float',
+        'spend'      => 'float',
+        'impressions' => 'integer',
+        'clicks'     => 'integer',
+        'ctr'        => 'float',
+        'cpc'        => 'float',
+        'results'    => 'float',
+        'ad_sets'    => 'array',
+        'metrics_synced_at' => 'datetime',
     ];
 
     public function leads()

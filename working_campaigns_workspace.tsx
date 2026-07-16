@@ -51,6 +51,14 @@ function toDateInput(value?: string | null) {
   return value ? value.slice(0, 10) : "";
 }
 
+function formatMetric(value?: number | null, options?: Intl.NumberFormatOptions) {
+  if (value == null || Number.isNaN(value)) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("en-US", options).format(value);
+}
+
 function toForm(campaign?: Campaign | null): CampaignForm {
   if (!campaign) {
     return initialForm;
@@ -407,8 +415,15 @@ export function CampaignsWorkspace() {
                           </div>
                           <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
                             {campaign.objective ? <span>{campaign.objective}</span> : null}
-                            {campaign.ad_account_id ? <span>Account {campaign.ad_account_id}</span> : null}
+                            {campaign.ad_account_name ? <span>{campaign.ad_account_name}</span> : campaign.ad_account_id ? <span>Account {campaign.ad_account_id}</span> : null}
                             {campaign.currency && campaign.budget != null ? <span>{campaign.budget} {campaign.currency}</span> : null}
+                            {campaign.spend != null ? <span>Spend {formatMetric(campaign.spend, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP</span> : null}
+                            {campaign.impressions != null ? <span>Impressions {formatMetric(campaign.impressions)}</span> : null}
+                            {campaign.clicks != null ? <span>Clicks {formatMetric(campaign.clicks)}</span> : null}
+                            {campaign.ctr != null ? <span>CTR {formatMetric(campaign.ctr, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span> : null}
+                            {campaign.cpc != null ? <span>CPC {formatMetric(campaign.cpc, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP</span> : null}
+                            {campaign.results != null ? <span>{campaign.result_label || "Results"} {formatMetric(campaign.results, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span> : null}
+                            {campaign.ad_sets?.length ? <span>Ad Sets {campaign.ad_sets.length}</span> : null}
                             {campaign.start_date ? <span>Starts {formatLocalDateTime(campaign.start_date, { year: "numeric", month: "short", day: "numeric" })}</span> : null}
                           </div>
                         </div>
@@ -473,9 +488,19 @@ export function CampaignsWorkspace() {
                 <Panel title="Campaign Details" description="Update campaign naming, timing, budget, and context without leaving the list view.">
                   <div className="mb-4 flex flex-wrap gap-3 text-xs text-slate-500">
                     <span>Campaign ID {selectedCampaign.id}</span>
-                    {selectedCampaign.ad_account_id ? <span>Ad Account {selectedCampaign.ad_account_id}</span> : null}
+                    {selectedCampaign.ad_account_name ? <span>{selectedCampaign.ad_account_name}</span> : selectedCampaign.ad_account_id ? <span>Ad Account {selectedCampaign.ad_account_id}</span> : null}
                     {selectedCampaign.objective ? <span>{selectedCampaign.objective}</span> : null}
                     {selectedCampaign.meta_source ? <span>Source {selectedCampaign.meta_source}</span> : null}
+                  </div>
+                  <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <StatCard label="Spend (EGP)" value={formatMetric(selectedCampaign.spend, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} hint="Lifetime spend from Meta insights." />
+                    <StatCard label="Impressions" value={formatMetric(selectedCampaign.impressions)} hint="Imported from Meta insights." />
+                    <StatCard label="Clicks" value={formatMetric(selectedCampaign.clicks)} hint="Imported from Meta insights." />
+                    <StatCard label="CTR" value={selectedCampaign.ctr != null ? `${formatMetric(selectedCampaign.ctr, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : "-"} hint="Click-through rate." />
+                    <StatCard label="CPC (EGP)" value={formatMetric(selectedCampaign.cpc, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} hint="Cost per click." />
+                    <StatCard label={selectedCampaign.result_label || "Results"} value={formatMetric(selectedCampaign.results, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} hint="Primary imported result metric." />
+                    <StatCard label="Ad Sets" value={selectedCampaign.ad_sets?.length ?? 0} hint="Ad sets currently nested under this campaign." />
+                    <StatCard label="Metrics Synced" value={selectedCampaign.metrics_synced_at ? toDateInput(selectedCampaign.metrics_synced_at) : "-"} hint="Last import/sync date." />
                   </div>
                   <form className="space-y-4" onSubmit={updateCampaign}>
                     <div className="grid gap-4 md:grid-cols-2">
@@ -497,6 +522,34 @@ export function CampaignsWorkspace() {
                       </button>
                     </div>
                   </form>
+                </Panel>
+              </div>
+
+              <div className="mt-5">
+                <Panel title="Ad Sets" description="Imported ad sets nested under this campaign from the selected Meta ad account.">
+                  {selectedCampaign.ad_sets?.length ? (
+                    <div className="space-y-3">
+                      {selectedCampaign.ad_sets.map((adSet) => (
+                        <div key={adSet.id} className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-semibold text-slate-950">{adSet.name}</div>
+                              <div className="mt-1 break-all text-xs text-slate-500">Ad Set ID {adSet.id}</div>
+                            </div>
+                            <div className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">{adSet.status || "No status"}</div>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+                            {adSet.optimization_goal ? <span>{adSet.optimization_goal}</span> : null}
+                            {adSet.budget != null ? <span>Budget {formatMetric(adSet.budget, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP</span> : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                      No ad sets were returned for this campaign at import time.
+                    </div>
+                  )}
                 </Panel>
               </div>
             </div>
