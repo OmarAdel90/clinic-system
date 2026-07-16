@@ -8,20 +8,28 @@ use Illuminate\Support\Facades\File;
 
 class MetaSettingsService
 {
+    public function __construct(protected MetaAdsService $metaAdsService) {}
+
     public function getSettings(): array
     {
+        $adsAccounts = $this->resolveAdAccounts();
+
         return [
             'webhook_url' => url('/api/webhook/meta'),
             'facebook_instagram' => [
                 'facebook_page_id' => (string) config('services.meta_facebook.page_id', ''),
                 'facebook_page_access_token' => (string) config('services.meta_facebook.page_access_token', ''),
                 'instagram_access_token' => (string) config('services.meta_facebook.instagram_access_token', ''),
+                'ads_access_token' => (string) config('services.meta_facebook.ads_access_token', ''),
+                'selected_ad_account_id' => (string) config('services.meta_facebook.ad_account_id', ''),
+                'available_ad_accounts' => $adsAccounts,
                 'app_id' => (string) config('services.meta_facebook.app_id', ''),
                 'app_secret' => (string) config('services.meta_app_secret', ''),
                 'verify_token' => (string) config('services.meta_facebook.verify_token', ''),
                 'api_version' => (string) config('services.meta_facebook.api_version', 'v20.0'),
                 'facebook_token_configured' => filled(config('services.meta_facebook.page_access_token')),
                 'instagram_token_configured' => filled(config('services.meta_facebook.instagram_access_token')),
+                'ads_token_configured' => filled(config('services.meta_facebook.ads_access_token')),
             ],
             'whatsapp' => [
                 'access_token' => (string) config('services.meta_whatsapp.access_token', ''),
@@ -40,6 +48,8 @@ class MetaSettingsService
             'META_FACEBOOK_PAGE_ID' => $data['facebook_page_id'] ?? '',
             'META_FACEBOOK_PAGE_ACCESS_TOKEN' => $data['facebook_page_access_token'] ?? '',
             'META_INSTAGRAM_ACCESS_TOKEN' => $data['instagram_access_token'] ?? '',
+            'META_ADS_ACCESS_TOKEN' => $data['ads_access_token'] ?? '',
+            'META_AD_ACCOUNT_ID' => $data['selected_ad_account_id'] ?? '',
             'META_APP_ID' => $data['app_id'] ?? '',
             'META_APP_SECRET' => $data['app_secret'] ?? '',
             'META_FACEBOOK_VERIFY_TOKEN' => $data['verify_token'],
@@ -50,6 +60,8 @@ class MetaSettingsService
             'services.meta_facebook.page_id' => $data['facebook_page_id'] ?? '',
             'services.meta_facebook.page_access_token' => $data['facebook_page_access_token'] ?? '',
             'services.meta_facebook.instagram_access_token' => $data['instagram_access_token'] ?? '',
+            'services.meta_facebook.ads_access_token' => $data['ads_access_token'] ?? '',
+            'services.meta_facebook.ad_account_id' => $data['selected_ad_account_id'] ?? '',
             'services.meta_facebook.app_id' => $data['app_id'] ?? '',
             'services.meta_facebook.verify_token' => $data['verify_token'],
             'services.meta_facebook.api_version' => $data['api_version'],
@@ -116,5 +128,33 @@ class MetaSettingsService
         }
 
         Artisan::call('config:clear');
+    }
+
+    protected function resolveAdAccounts(): array
+    {
+        $token = (string) config('services.meta_facebook.ads_access_token', '');
+
+        if (blank($token)) {
+            return [];
+        }
+
+        try {
+            return collect($this->metaAdsService->listAdAccounts($token))
+                ->map(function (array $account) {
+                    $id = (string) ($account['account_id'] ?? $account['id'] ?? '');
+
+                    return [
+                        'id' => $id,
+                        'name' => $account['name'] ?? ('Ad Account ' . $id),
+                        'currency' => $account['currency'] ?? null,
+                        'account_status' => $account['account_status'] ?? null,
+                    ];
+                })
+                ->filter(fn (array $account) => filled($account['id']))
+                ->values()
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 }

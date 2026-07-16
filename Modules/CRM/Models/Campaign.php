@@ -9,8 +9,10 @@ class Campaign extends Model
 {
     use HasFactory;
 
-        protected $fillable = [
+    protected $fillable = [
+        'id',
         'name',
+        'ad_account_id',
         'platform',
         'description',
         'start_date',
@@ -18,9 +20,12 @@ class Campaign extends Model
         'budget',
         'currency',
         'status',
+        'objective',
+        'meta_source',
     ];
 
     protected $casts = [
+        'id'         => 'string',
         'start_date' => 'date',
         'end_date'   => 'date',
         'budget'     => 'float',

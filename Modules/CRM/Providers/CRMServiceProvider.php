@@ -11,6 +11,7 @@ class CRMServiceProvider extends ServiceProvider
         $this->app->singleton(\Modules\CRM\Services\CallCenterService::class);
         $this->app->singleton(\Modules\CRM\Services\CampaignService::class);
         $this->app->singleton(\Modules\CRM\Services\CampaignCostService::class);
+        $this->app->singleton(\Modules\CRM\Services\MetaAdsService::class);
         $this->app->singleton(\Modules\CRM\Services\WebhookService::class);
     }
 

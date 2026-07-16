@@ -3,6 +3,7 @@
 namespace Modules\CRM\Services;
 
 use Modules\CRM\Models\Conversation;
+use Modules\CRM\Models\Campaign;
 use Modules\CRM\Models\Message;
 use Modules\CRM\Models\WebhookLog;
 use Modules\Lead\Models\Lead;
@@ -89,6 +90,7 @@ class WebhookService
         $messageId = $msgData['id'] ?? null;
         $timestamp = $msgData['timestamp'] ?? now()->timestamp;
         $type = $msgData['type'] ?? 'unknown';
+        $metaCampaignId = $this->extractMetaCampaignId($value);
 
         if (!$waId) {
             Log::warning('WhatsApp webhook missing wa_id', ['msg' => $msgData]);
@@ -106,12 +108,18 @@ class WebhookService
                 'phone'       => $phone,
                 'name'        => $profileName,
                 'profile_name' => $profileName,
-                'metadata'    => ['source' => 'whatsapp_webhook'],
+                'campaign_id' => $this->resolveCampaignId($metaCampaignId),
+                'metadata'    => $this->buildLeadMetadata('whatsapp_webhook', $metaCampaignId, $value),
             ]
         );
 
         if (!$lead->wasRecentlyCreated && $profileName && $lead->name !== $profileName) {
-            $lead->update(['profile_name' => $profileName, 'name' => $profileName]);
+            $lead->update([
+                'profile_name' => $profileName,
+                'name' => $profileName,
+                'campaign_id' => $lead->campaign_id ?: $this->resolveCampaignId($metaCampaignId),
+                'metadata' => $this->mergeLeadMetadata($lead->metadata, $this->buildLeadMetadata('whatsapp_webhook', $metaCampaignId, $value)),
+            ]);
         }
 
         $conversation = Conversation::firstOrCreate(
@@ -188,6 +196,7 @@ class WebhookService
         $mid = $message['mid'] ?? null;
         $text = $message['text'] ?? null;
         $attachments = $message['attachments'] ?? [];
+        $metaCampaignId = $this->extractMetaCampaignId($event);
 
         if (!$psid || (!$text && empty($attachments))) return;
 
@@ -196,10 +205,18 @@ class WebhookService
             [
                 'phone'    => null,
                 'name'     => null,
+                'campaign_id' => $this->resolveCampaignId($metaCampaignId),
                 'platform' => 'facebook',
-                'metadata' => ['source' => 'facebook_webhook'],
+                'metadata' => $this->buildLeadMetadata('facebook_webhook', $metaCampaignId, $event),
             ]
         );
+
+        if (! $lead->wasRecentlyCreated && ($metaCampaignId || data_get($event, 'referral'))) {
+            $lead->update([
+                'campaign_id' => $lead->campaign_id ?: $this->resolveCampaignId($metaCampaignId),
+                'metadata' => $this->mergeLeadMetadata($lead->metadata, $this->buildLeadMetadata('facebook_webhook', $metaCampaignId, $event)),
+            ]);
+        }
 
         $conversation = Conversation::firstOrCreate(
             ['lead_id' => $lead->id, 'platform' => 'facebook'],
@@ -263,6 +280,7 @@ class WebhookService
         $mid = $message['mid'] ?? null;
         $text = $message['text'] ?? null;
         $attachments = $message['attachments'] ?? [];
+        $metaCampaignId = $this->extractMetaCampaignId($event);
 
         if (!$igid || (!$text && empty($attachments))) return;
 
@@ -271,10 +289,18 @@ class WebhookService
             [
                 'phone'    => null,
                 'name'     => null,
+                'campaign_id' => $this->resolveCampaignId($metaCampaignId),
                 'platform' => 'instagram',
-                'metadata' => ['source' => 'instagram_webhook'],
+                'metadata' => $this->buildLeadMetadata('instagram_webhook', $metaCampaignId, $event),
             ]
         );
+
+        if (! $lead->wasRecentlyCreated && ($metaCampaignId || data_get($event, 'referral'))) {
+            $lead->update([
+                'campaign_id' => $lead->campaign_id ?: $this->resolveCampaignId($metaCampaignId),
+                'metadata' => $this->mergeLeadMetadata($lead->metadata, $this->buildLeadMetadata('instagram_webhook', $metaCampaignId, $event)),
+            ]);
+        }
 
         $conversation = Conversation::firstOrCreate(
             ['lead_id' => $lead->id, 'platform' => 'instagram'],
@@ -366,5 +392,63 @@ class WebhookService
         }
 
         return 'unknown';
+    }
+
+    protected function resolveCampaignId(?string $metaCampaignId): ?int
+    {
+        if (blank($metaCampaignId)) {
+            return null;
+        }
+
+        return Campaign::query()->whereKey((int) $metaCampaignId)->exists()
+            ? (int) $metaCampaignId
+            : null;
+    }
+
+    protected function buildLeadMetadata(string $source, ?string $metaCampaignId, array $payload): array
+    {
+        return array_filter([
+            'source' => $source,
+            'meta_campaign_id' => $metaCampaignId,
+            'meta_ad_id' => $this->extractNestedValue($payload, 'ad_id'),
+            'meta_adset_id' => $this->extractNestedValue($payload, 'adset_id'),
+        ], fn ($value) => filled($value));
+    }
+
+    protected function mergeLeadMetadata(?array $current, array $incoming): array
+    {
+        return array_filter(array_merge($current ?? [], $incoming), fn ($value) => $value !== null && $value !== '');
+    }
+
+    protected function extractMetaCampaignId(array $payload): ?string
+    {
+        $candidate = $this->extractNestedValue($payload, 'campaign_id');
+
+        if (filled($candidate)) {
+            return (string) $candidate;
+        }
+
+        $referral = data_get($payload, 'referral') ?? data_get($payload, 'postback.referral');
+        $candidate = data_get($referral, 'ads_context_data.campaign_id');
+
+        return filled($candidate) ? (string) $candidate : null;
+    }
+
+    protected function extractNestedValue(array $payload, string $needle): mixed
+    {
+        foreach ($payload as $key => $value) {
+            if ($key === $needle) {
+                return $value;
+            }
+
+            if (is_array($value)) {
+                $nested = $this->extractNestedValue($value, $needle);
+                if ($nested !== null) {
+                    return $nested;
+                }
+            }
+        }
+
+        return null;
     }
 }

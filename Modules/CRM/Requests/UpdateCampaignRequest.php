@@ -15,6 +15,7 @@ class UpdateCampaignRequest extends FormRequest
     {
         return [
             'name'        => 'sometimes|required|string|max:255',
+            'ad_account_id' => 'nullable|string|max:100',
             'platform'    => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'start_date'  => 'nullable|date',
@@ -22,6 +23,8 @@ class UpdateCampaignRequest extends FormRequest
             'budget'      => 'nullable|numeric|min:0',
             'currency'    => ['nullable', 'string', 'size:3', 'regex:/^[A-Z]{3}$/'],
             'status'      => 'nullable|in:draft,active,paused',
+            'objective'   => 'nullable|string|max:255',
+            'meta_source' => 'nullable|string|max:50',
         ];
     }
 }

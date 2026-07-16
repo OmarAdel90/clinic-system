@@ -17,6 +17,8 @@ class UpdateMetaFacebookSettingsRequest extends FormRequest
             'facebook_page_id' => 'nullable|string|max:100',
             'facebook_page_access_token' => 'nullable|string',
             'instagram_access_token' => 'nullable|string',
+            'ads_access_token' => 'nullable|string',
+            'selected_ad_account_id' => 'nullable|string|max:100',
             'app_id' => 'nullable|string|max:100',
             'app_secret' => 'nullable|string',
             'verify_token' => 'required|string|max:255',

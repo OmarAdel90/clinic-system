@@ -19,6 +19,8 @@ Route::middleware(['auth:sanctum'])->prefix('call-center')->group(function () {
 Route::middleware(['auth:sanctum'])->prefix('campaigns')->group(function () {
     Route::get('/', [CampaignController::class, 'index']);
     Route::post('/', [CampaignController::class, 'store']);
+    Route::get('meta/available', [CampaignController::class, 'availableMetaCampaigns']);
+    Route::post('meta/import', [CampaignController::class, 'importMetaCampaigns']);
     Route::get('{campaign}', [CampaignController::class, 'show']);
     Route::patch('{campaign}', [CampaignController::class, 'update']);
     Route::delete('{campaign}', [CampaignController::class, 'destroy']);

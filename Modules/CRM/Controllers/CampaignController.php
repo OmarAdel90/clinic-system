@@ -9,6 +9,8 @@ use Modules\CRM\Requests\ShowCampaignRequest;
 use Modules\CRM\Requests\StoreCampaignRequest;
 use Modules\CRM\Requests\UpdateCampaignRequest;
 use Modules\CRM\Requests\DestroyCampaignRequest;
+use Modules\CRM\Requests\ImportMetaCampaignsRequest;
+use Modules\CRM\Requests\ListMetaCampaignsRequest;
 use Modules\CRM\Services\CampaignService;
 use Illuminate\Http\JsonResponse;
 
@@ -40,5 +42,15 @@ class CampaignController extends Controller
     {
         $this->service->delete($campaign);
         return response()->json(null, 204);
+    }
+
+    public function availableMetaCampaigns(ListMetaCampaignsRequest $request): JsonResponse
+    {
+        return response()->json($this->service->getAvailableMetaCampaigns());
+    }
+
+    public function importMetaCampaigns(ImportMetaCampaignsRequest $request): JsonResponse
+    {
+        return response()->json($this->service->importMetaCampaigns($request->validated()['campaign_ids']), 201);
     }
 }

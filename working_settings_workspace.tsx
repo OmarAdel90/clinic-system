@@ -7,6 +7,7 @@ import type { MetaSettingsPayload } from "@/lib/types";
 import { PageHeader } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import { WorkflowInput } from "@/components/workflow-input";
+import { WorkflowSelect } from "@/components/workflow-select";
 
 const SEEDED_ADMIN_EMAIL = "super@clinic.com";
 
@@ -229,6 +230,10 @@ export function SettingsWorkspace() {
                   <span className={`h-2.5 w-2.5 rounded-full ${facebookForm.instagram_token_configured ? "bg-emerald-500" : "bg-slate-300"}`} />
                   Instagram token {facebookForm.instagram_token_configured ? "configured" : "optional"}
                 </div>
+                <div className="inline-flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${facebookForm.ads_token_configured ? "bg-emerald-500" : "bg-slate-300"}`} />
+                  Meta ads token {facebookForm.ads_token_configured ? "configured" : "missing"}
+                </div>
               </div>
             </div>
           </div>
@@ -253,6 +258,23 @@ export function SettingsWorkspace() {
               value={facebookForm.instagram_access_token}
               onChange={(value) => setFacebookForm((current) => current ? { ...current, instagram_access_token: value } : current)}
               placeholder="Leave blank to reuse the Facebook token"
+            />
+            <SecretField
+              label="Meta Ads Access Token"
+              name="meta-ads-access-token"
+              value={facebookForm.ads_access_token}
+              onChange={(value) => setFacebookForm((current) => current ? { ...current, ads_access_token: value } : current)}
+              placeholder="Token used to read accessible ad accounts and campaigns"
+            />
+            <WorkflowSelect
+              label="Selected Ad Account"
+              value={facebookForm.selected_ad_account_id}
+              onChange={(value) => setFacebookForm((current) => current ? { ...current, selected_ad_account_id: value } : current)}
+              options={(facebookForm.available_ad_accounts ?? []).map((account) => ({
+                label: `${account.name}${account.currency ? ` | ${account.currency}` : ""}`,
+                value: account.id,
+              }))}
+              emptyLabel={facebookForm.available_ad_accounts?.length ? "Choose an ad account" : "Save the ads token first to load accounts"}
             />
             <WorkflowInput
               label="App ID"
@@ -296,7 +318,7 @@ export function SettingsWorkspace() {
 
       <Panel
         title="WhatsApp Business"
-        description="Store the WhatsApp Cloud API access token and identifiers used by inbound and outbound WhatsApp messaging."
+        description="Store the WhatsApp Cloud API access token and identifiers used by inbound and outbound WhatsApp messaging. WhatsApp uses the shared Meta webhook URL shown below."
       >
         <div className="space-y-5">
           {whatsappNotice ? <NoticeBanner message={whatsappNotice} tone="success" /> : null}
@@ -305,9 +327,13 @@ export function SettingsWorkspace() {
           <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-4">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <span className={`h-2.5 w-2.5 rounded-full ${whatsappForm.access_token_configured ? "bg-emerald-500" : "bg-slate-300"}`} />
-              WhatsApp access token {whatsappForm.access_token_configured ? "configured" : "missing"}
+              WhatsApp access token {whatsappForm.access_token_configured ? "is configured" : "is missing"}
             </div>
-            <p className="mt-3 break-all text-sm font-medium text-slate-900">{webhookUrl}</p>
+            <div className="mt-4 space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Shared Meta webhook URL</p>
+              <p className="break-all text-sm font-medium text-slate-900">{webhookUrl}</p>
+              <p className="text-xs text-slate-500">This same callback URL is used for WhatsApp, Facebook, and Instagram webhook events.</p>
+            </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">

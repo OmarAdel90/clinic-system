@@ -32,6 +32,7 @@ class Lead extends Model
 
     protected $casts = [
         'metadata' => 'array',
+        'campaign_id' => 'string',
         'clinic_assigned_at' => 'datetime',
     ];
 
