@@ -40,9 +40,28 @@ class MetaAdsService
         return array_map(function (array $campaign) use ($token, $version) {
             $campaignId = (string) ($campaign['id'] ?? '');
 
+            if ($campaignId === '') {
+                return $campaign;
+            }
+
+            $insights = [];
+            $adSets = [];
+
+            try {
+                $insights = $this->campaignInsights($campaignId, $token, $version);
+            } catch (\Throwable) {
+                $insights = [];
+            }
+
+            try {
+                $adSets = $this->campaignAdSets($campaignId, $token, $version);
+            } catch (\Throwable) {
+                $adSets = [];
+            }
+
             return array_merge($campaign, [
-                'insights' => $campaignId !== '' ? $this->campaignInsights($campaignId, $token, $version) : [],
-                'adsets' => $campaignId !== '' ? $this->campaignAdSets($campaignId, $token, $version) : [],
+                'insights' => $insights,
+                'adsets' => $adSets,
             ]);
         }, $campaigns);
     }
@@ -88,14 +107,18 @@ class MetaAdsService
 
     protected function campaignAdSets(string $campaignId, string $token, string $version): array
     {
-        return $this->collectPaginated(
-            "https://graph.facebook.com/{$version}/{$campaignId}/adsets",
-            $token,
-            [
-                'fields' => 'id,name,status,optimization_goal,daily_budget,lifetime_budget',
-                'limit' => 200,
-            ],
-        );
+        try {
+            return $this->collectPaginated(
+                "https://graph.facebook.com/{$version}/{$campaignId}/adsets",
+                $token,
+                [
+                    'fields' => 'id,name,status,optimization_goal,daily_budget,lifetime_budget',
+                    'limit' => 200,
+                ],
+            );
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     protected function resolveAccessToken(?string $token = null): string

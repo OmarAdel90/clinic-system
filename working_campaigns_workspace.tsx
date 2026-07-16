@@ -107,6 +107,7 @@ export function CampaignsWorkspace() {
   const [importingMeta, setImportingMeta] = useState(false);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [metaError, setMetaError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const filteredCampaigns = useMemo(() => {
@@ -184,13 +185,14 @@ export function CampaignsWorkspace() {
 
   async function loadMetaCampaigns() {
     setLoadingMeta(true);
+    setMetaError(null);
 
     try {
       const payload = await fetchCollection<MetaAvailableCampaign>("/campaigns/meta/available");
       setAvailableMetaCampaigns(payload);
     } catch (err) {
       setAvailableMetaCampaigns([]);
-      setError(err instanceof Error ? err.message : "Unable to load Meta campaigns.");
+      setMetaError(err instanceof Error ? err.message : "Unable to load Meta campaigns.");
     } finally {
       setLoadingMeta(false);
     }
@@ -283,6 +285,7 @@ export function CampaignsWorkspace() {
 
     setImportingMeta(true);
     setError(null);
+    setMetaError(null);
     setNotice(null);
 
     try {
@@ -291,7 +294,7 @@ export function CampaignsWorkspace() {
       setSelectedMetaCampaignIds([]);
       await Promise.all([load(), loadMetaCampaigns()]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to import Meta campaigns.");
+      setMetaError(err instanceof Error ? err.message : "Unable to import Meta campaigns.");
     } finally {
       setImportingMeta(false);
     }
@@ -352,6 +355,7 @@ export function CampaignsWorkspace() {
         <div className="space-y-6">
           <Panel title="Import From Selected Meta Ad Account" description="The ad account is chosen in Settings. Pull its campaigns here, then import only the ones you want visible in the system.">
             <div className="space-y-4">
+              {metaError ? <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">{metaError}</div> : null}
               <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                 <div className="min-w-0 flex-1">
                   <WorkflowInput

@@ -94,13 +94,21 @@ class CampaignService
         }
 
         $existingIds = Campaign::query()->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $accountLookup = collect();
 
-        $accountLookup = collect($this->metaAdsService->listAdAccounts($adsToken))
-            ->mapWithKeys(function (array $account) {
-                $id = preg_replace('/^act_/i', '', (string) ($account['account_id'] ?? $account['id'] ?? ''));
+        try {
+            $accountLookup = collect($this->metaAdsService->listAdAccounts($adsToken))
+                ->mapWithKeys(function (array $account) {
+                    $id = preg_replace('/^act_/i', '', (string) ($account['account_id'] ?? $account['id'] ?? ''));
 
-                return $id !== '' ? [$id => ($account['name'] ?? ('Ad Account ' . $id))] : [];
-            });
+                    return $id !== '' ? [$id => ($account['name'] ?? ('Ad Account ' . $id))] : [];
+                });
+        } catch (\Throwable $e) {
+            Log::warning(__METHOD__ . ' unable to decorate Meta campaigns with ad account labels', [
+                'ad_account_id' => $adAccountId,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return collect($this->metaAdsService->listCampaigns($adAccountId))
             ->map(function (array $campaign) use ($adAccountId, $existingIds, $accountLookup) {
