@@ -14,6 +14,7 @@ require __DIR__ . '/modules/warehouse.php';
 require __DIR__ . '/modules/supplier.php';
 require __DIR__ . '/modules/transaction.php';
 require __DIR__ . '/modules/visit.php';
+require __DIR__ . '/modules/report.php';
 require __DIR__ . '/modules/invoice.php';
 require __DIR__ . '/modules/treatment-plan.php';
 require __DIR__ . '/modules/crm.php';

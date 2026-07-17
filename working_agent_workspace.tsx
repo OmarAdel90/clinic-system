@@ -435,7 +435,7 @@ export function AgentWorkspace() {
         fetchResource<AgentMetrics>("/agent/metrics"),
         fetchCollection<FollowUp>("/agent/followups"),
         fetchResource<PaginatedResponse<Conversation>>(`${buildConversationSearchPath(conversationSearch)}${buildConversationSearchPath(conversationSearch).includes("?") ? "&" : "?"}platform=${encodeURIComponent(conversationPlatform)}&page=${conversationPage}&per_page=${CONVERSATIONS_PAGE_SIZE}`),
-        clinics.length === 0 ? fetchCollection<Clinic>("/clinics").catch(() => []) : Promise.resolve(clinics),
+        clinics.length === 0 ? fetchResource<PaginatedResponse<Clinic>>(`/clinics?page=1&per_page=100`).then((payload) => payload.data).catch(() => []) : Promise.resolve(clinics),
         leadStatuses.length === 0 ? fetchCollection<LeadStatus>("/lead-statuses").catch(() => []) : Promise.resolve(leadStatuses),
       ]);
 

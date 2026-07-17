@@ -182,14 +182,14 @@ export function LeadsWorkspaceV2() {
       const [campaignRows, statusRows, clinicRows, userRows] = await Promise.all([
         fetchCollection<Campaign>("/campaigns"),
         fetchCollection<LeadStatus>("/lead-statuses").catch(() => []),
-        fetchCollection<Clinic>("/clinics"),
-        fetchCollection<User>("/users"),
+        fetchResource<PaginatedResponse<Clinic>>(`/clinics?page=1&per_page=100`),
+        fetchResource<PaginatedResponse<User>>(`/users?page=1&per_page=100`),
       ]);
 
       setCampaigns(campaignRows);
       setStatuses(statusRows);
-      setClinics(clinicRows);
-      setUsers(userRows);
+      setClinics(clinicRows.data);
+      setUsers(userRows.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load leads.");
     }

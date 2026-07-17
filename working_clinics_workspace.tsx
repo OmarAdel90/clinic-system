@@ -235,10 +235,10 @@ export function ClinicsWorkspace() {
   async function loadLookups() {
     try {
       const [userPayload, warehousePayload] = await Promise.all([
-        fetchCollection<User>("/users"),
+        fetchResource<PaginatedResponse<User>>(`/users?page=1&per_page=100`),
         fetchCollection<Warehouse>("/warehouses"),
       ]);
-      setUsers(userPayload);
+      setUsers(userPayload.data);
       setWarehouses(warehousePayload);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load clinics.");
