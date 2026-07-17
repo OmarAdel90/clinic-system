@@ -60,6 +60,8 @@ class RolePermissionSeeder extends Seeder
             }
         }
 
+        Permission::findOrCreate('view_dashboard', 'web');
+
         $admin = Role::findOrCreate('admin', 'web');
         $admin->syncPermissions(Permission::all());
     }

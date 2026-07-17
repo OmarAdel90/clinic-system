@@ -266,6 +266,36 @@ class AgentController extends Controller
         return response()->json($this->performanceMetricsService->getForUser($targetUser));
     }
 
+    public function teamMetrics(Request $request): JsonResponse
+    {
+        $actor = $request->user();
+
+        abort_unless(
+            $actor->can('view_any_call_center_performance_metrics'),
+            403,
+            'Unauthorized action.',
+        );
+
+        $users = User::query()
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query
+                    ->whereHas('roles')
+                    ->orWhereHas('permissions', function ($permissionQuery) {
+                        $permissionQuery->whereIn('name', [
+                            'view_conversation',
+                            'view_any_conversation',
+                            'view_follow_up',
+                            'view_any_follow_up',
+                        ]);
+                    });
+            })
+            ->orderBy('name')
+            ->get();
+
+        return response()->json($this->performanceMetricsService->getForUsers($users));
+    }
+
     protected function dispatchOutboundMessage(
         Conversation $conversation,
         ?string $body,

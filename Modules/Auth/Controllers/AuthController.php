@@ -34,6 +34,10 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials.'], 401);
         }
 
+        if (! ($user->is_active ?? true)) {
+            return response()->json(['message' => 'This account is inactive.'], 403);
+        }
+
         $user->tokens()->delete();
 
         $token = $user->createToken('auth_token', ['*'], now()->addMinutes(config('sanctum.expiration')));

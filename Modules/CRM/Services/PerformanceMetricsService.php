@@ -11,6 +11,21 @@ use Modules\Visit\Models\Visit;
 
 class PerformanceMetricsService
 {
+    public function getForUsers(iterable $users): array
+    {
+        $metrics = [];
+
+        foreach ($users as $user) {
+            $metrics[] = $this->getForUser($user);
+        }
+
+        usort($metrics, function (array $left, array $right) {
+            return strcmp((string) ($left['user_name'] ?? ''), (string) ($right['user_name'] ?? ''));
+        });
+
+        return $metrics;
+    }
+
     public function getForUser(User $user): array
     {
         $conversationIds = Conversation::query()
