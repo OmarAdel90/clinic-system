@@ -78,18 +78,28 @@ class PerformanceMetricsService
             return null;
         }
 
+        $cutoff = now()->subDays(30);
         $totalMinutes = 0.0;
         $samples = 0;
 
         foreach ($conversationIds as $conversationId) {
-            $firstInbound = Message::query()
+            $recentInbound = Message::query()
                 ->where('conversation_id', $conversationId)
                 ->where('direction', 'inbound')
-                ->orderBy('sent_at')
-                ->orderBy('created_at')
+                ->where(function ($query) use ($cutoff) {
+                    $query->where('sent_at', '>=', $cutoff)
+                        ->orWhere('created_at', '>=', $cutoff);
+                })
+                ->orderByDesc('sent_at')
+                ->orderByDesc('created_at')
                 ->first();
 
-            if (! $firstInbound) {
+            if (! $recentInbound) {
+                continue;
+            }
+
+            $inboundAt = $recentInbound->sent_at ?? $recentInbound->created_at;
+            if (! $inboundAt) {
                 continue;
             }
 
@@ -97,9 +107,9 @@ class PerformanceMetricsService
                 ->where('conversation_id', $conversationId)
                 ->where('user_id', $userId)
                 ->where('direction', 'outbound')
-                ->where(function ($query) use ($firstInbound) {
-                    $query->where('sent_at', '>=', $firstInbound->sent_at ?? $firstInbound->created_at)
-                        ->orWhere('created_at', '>=', $firstInbound->created_at);
+                ->where(function ($query) use ($inboundAt) {
+                    $query->where('sent_at', '>=', $inboundAt)
+                        ->orWhere('created_at', '>=', $inboundAt);
                 })
                 ->orderBy('sent_at')
                 ->orderBy('created_at')
@@ -109,7 +119,6 @@ class PerformanceMetricsService
                 continue;
             }
 
-            $inboundAt = $firstInbound->sent_at ?? $firstInbound->created_at;
             $outboundAt = $firstOutbound->sent_at ?? $firstOutbound->created_at;
 
             if (! $inboundAt || ! $outboundAt || $outboundAt->lt($inboundAt)) {

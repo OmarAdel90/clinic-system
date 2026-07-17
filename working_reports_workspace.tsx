@@ -153,9 +153,12 @@ export function ReportsWorkspace() {
 
   useEffect(() => {
     setEditForm(toEditForm(selectedReport));
+  }, [selectedReport]);
+
+  useEffect(() => {
     setDetailsError(null);
     setDetailsNotice(null);
-  }, [selectedReport]);
+  }, [selectedId, detailsOpen]);
 
   async function updateReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
