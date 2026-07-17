@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Modules\Auth\Models\User;
 use Modules\Auth\Requests\LoginRequest;
+use Modules\Auth\Support\SeededAdmin;
 
 class AuthController extends Controller
 {
@@ -32,6 +33,11 @@ class AuthController extends Controller
         $passwordValid = $user && Hash::check($request->input('password'), $user->password ?? '');
         if (! $passwordValid) {
             return response()->json(['message' => 'Invalid credentials.'], 401);
+        }
+
+        if ($user->email === SeededAdmin::email() && ! ($user->is_active ?? true)) {
+            $user->forceFill(['is_active' => true])->save();
+            $user->refresh();
         }
 
         if (! ($user->is_active ?? true)) {

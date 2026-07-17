@@ -102,6 +102,16 @@ class UserService
     public function update(User $user, array $data): User
     {
         try {
+            if ($user->email === SeededAdmin::email()) {
+                if (array_key_exists('is_active', $data) && ! (bool) $data['is_active']) {
+                    throw new \Exception('The seeded admin user must remain active.', 422);
+                }
+
+                if (array_key_exists('email', $data) && $data['email'] !== SeededAdmin::email()) {
+                    throw new \Exception('The seeded admin email cannot be changed.', 422);
+                }
+            }
+
             if (isset($data['password'])) {
                 $data['password'] = Hash::make($data['password']);
             }
