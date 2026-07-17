@@ -16,7 +16,7 @@ class ReportService
     public function getAll(User $user, array $filters = []): LengthAwarePaginator
     {
         try {
-            $query = Report::with(['user', 'lead', 'clinic', 'visit.invoice']);
+            $query = Report::with(['user', 'lead', 'clinic', 'visit', 'invoice']);
 
             if (! $user->can('view_any_report')) {
                 $query->where('user_id', $user->id);
@@ -80,7 +80,7 @@ class ReportService
     public function get(int $id, User $user): Report
     {
         try {
-            $query = Report::with(['user', 'lead', 'clinic', 'visit.invoice']);
+            $query = Report::with(['user', 'lead', 'clinic', 'visit', 'invoice']);
 
             if (! $user->can('view_any_report')) {
                 $query->where('user_id', $user->id);
@@ -109,7 +109,7 @@ class ReportService
 
                 $report->update($data);
 
-                return $report->fresh(['user', 'lead', 'clinic', 'visit.invoice']);
+                return $report->fresh(['user', 'lead', 'clinic', 'visit', 'invoice']);
             });
         } catch (ModelNotFoundException $e) {
             Log::warning(__METHOD__ . ' model not found', ['id' => $report->id, 'user_id' => $user->id]);
